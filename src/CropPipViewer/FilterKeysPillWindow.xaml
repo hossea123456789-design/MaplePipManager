@@ -1,0 +1,40 @@
+<Window x:Class="CropPipViewer.FilterKeysPillWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FilterKeys Pill" Width="60" Height="20"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
+        SizeToContent="Manual">
+    <Border x:Name="PillBorder"
+            CornerRadius="10"
+            Background="#753131"
+            BorderBrush="#522020"
+            BorderThickness="1"
+            Padding="5,0"
+            Cursor="Hand"
+            MouseLeftButtonDown="Pill_MouseLeftButtonDown"
+            MouseMove="Pill_MouseMove"
+            MouseLeftButtonUp="Pill_MouseLeftButtonUp">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Ellipse x:Name="StatusDot"
+                     Width="4" Height="4"
+                     Fill="#ff7777"
+                     Margin="0,0,4,0"
+                     VerticalAlignment="Center"/>
+            <TextBlock x:Name="StateText"
+                       Grid.Column="1"
+                       Text="OFF"
+                       Foreground="White"
+                       FontSize="9"
+                       FontWeight="Bold"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       TextWrapping="NoWrap"
+                       TextTrimming="None"/>
+        </Grid>
+    </Border>
+</Window>

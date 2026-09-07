@@ -1,0 +1,57 @@
+<Window x:Class="CropPipViewer.PreviewCropWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Height="720" Width="1100" WindowStartupLocation="CenterOwner"
+        Background="#222" Focusable="True" PreviewKeyDown="Window_PreviewKeyDown" PreviewKeyUp="Window_PreviewKeyUp">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Margin="12,10,12,8">
+            <TextBlock Text="캡처된 메이플 화면 안에서 필요한 영역을 드래그하세요. 마우스 휠=확대/축소, 더블클릭=2배 확대/복귀, Space+좌클릭 드래그=확대 화면 이동, 우클릭=복사/붙여넣기, Enter=확정, Esc=취소"
+                       Foreground="White" FontWeight="Bold"/>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <TextBlock Text="크롭 모양" Foreground="#DDFEEE" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="ShapeCombo" Width="130" Height="28" SelectionChanged="ShapeCombo_SelectionChanged">
+                    <ComboBoxItem Content="직사각형" Tag="Rectangle" IsSelected="True"/>
+                    <ComboBoxItem Content="원형" Tag="Circle"/>
+                    <ComboBoxItem Content="정사각형" Tag="Square"/>
+                    <ComboBoxItem Content="마름모" Tag="Diamond"/>
+                </ComboBox>
+                <TextBlock x:Name="ShapeHintText" Text="원형/정사각형/마름모는 드래그 시 정사각형 기준으로 잡힙니다."
+                           Foreground="#B9D8CF" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0"/>
+            </StackPanel>
+            <TextBlock x:Name="HintText" Text="기존 영역이 있으면 초록 박스로 먼저 표시됩니다. 초록 박스를 클릭하면 바로 위치 이동 모드가 켜집니다. 박스 밖을 드래그하면 새 영역을 다시 잡습니다."
+                       Foreground="#B9D8CF" FontSize="12" Margin="0,5,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+        <ScrollViewer x:Name="PreviewScrollViewer" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" PanningMode="None">
+            <Grid x:Name="PreviewHost" Background="#111"
+                  MouseLeftButtonDown="PreviewHost_MouseLeftButtonDown"
+                  MouseMove="PreviewHost_MouseMove"
+                  MouseLeftButtonUp="PreviewHost_MouseLeftButtonUp"
+                  MouseRightButtonDown="PreviewHost_MouseRightButtonDown"
+                  PreviewMouseWheel="PreviewHost_MouseWheel">
+                <Image x:Name="PreviewImage" Stretch="None"/>
+                <Canvas x:Name="OverlayCanvas" IsHitTestVisible="True">
+                    <Path x:Name="SelectionShape" Stroke="#00FF66" StrokeThickness="2" Fill="#3300FF66" Visibility="Collapsed" IsHitTestVisible="False"/>
+                    <Button x:Name="MoveModeButton" Content="이동" Width="54" Height="24" Visibility="Collapsed"
+                            Click="MoveModeButton_Click" ToolTip="초록 영역을 클릭해도 이동 모드가 켜집니다. 버튼으로도 ON/OFF할 수 있습니다."
+                            Background="#153A2D" Foreground="#DDFEEE" BorderBrush="#00CC66" FontSize="11" Padding="0"/>
+                </Canvas>
+            </Grid>
+        </ScrollViewer>
+        <Grid Grid.Row="2" Margin="12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button x:Name="BottomMoveModeButton" Content="위치 이동 모드 OFF" Width="140" Height="32" Margin="0,0,8,0" Click="MoveModeButton_Click"/>
+                <Button x:Name="PasteTemplateButton" Content="복사 형태 붙여넣기" Width="130" Height="32" Margin="0,0,8,0" Click="PasteTemplateButton_Click" Visibility="Collapsed"/>
+                <TextBlock x:Name="MoveModeHintText" Text="OFF: 초록 영역 클릭 시 이동 ON / ON: 방향키로 영역 이동" Foreground="#B9D8CF" FontSize="12" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="취소" Width="100" Height="32" Margin="0,0,8,0" Click="Cancel_Click"/>
+                <Button Content="확정" Width="100" Height="32" Click="Ok_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
