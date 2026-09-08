@@ -5,20 +5,35 @@ setlocal EnableExtensions EnableDelayedExpansion
 set "ROOT=%~dp0.."
 for %%I in ("%ROOT%") do set "ROOT=%%~fI"
 set "PROJECT=%ROOT%\src\CropPipViewer\CropPipViewer.csproj"
+set "VERSION_FILE=%ROOT%\VERSION"
 set "ARTIFACTS=%ROOT%\artifacts"
 set "PUBLISH=%ARTIFACTS%\_singlefile_publish"
-set "OUT=%ARTIFACTS%\CropPipViewer_v0.9.0-beta_win-x64"
-set "ZIP=%ARTIFACTS%\CropPipViewer_v0.9.0-beta_win-x64.zip"
-set "HASH=%ZIP%.sha256.txt"
 set "LOG=%ROOT%\BUILD_PUBLIC_RELEASE.log"
+
+if not exist "%VERSION_FILE%" (
+    echo [FAIL] VERSION file was not found: %VERSION_FILE%
+    pause
+    exit /b 21
+)
+set /p APP_VERSION=<"%VERSION_FILE%"
+if "%APP_VERSION%"=="" (
+    echo [FAIL] VERSION file is empty.
+    pause
+    exit /b 22
+)
+
+set "OUT=%ARTIFACTS%\CropPipViewer_v%APP_VERSION%_win-x64"
+set "ZIP=%ARTIFACTS%\CropPipViewer_v%APP_VERSION%_win-x64.zip"
+set "HASH=%ZIP%.sha256.txt"
 
 >"%LOG%" echo Maple PiP Manager release build log
 >>"%LOG%" echo Started: %DATE% %TIME%
 >>"%LOG%" echo ROOT=%ROOT%
 >>"%LOG%" echo PROJECT=%PROJECT%
+>>"%LOG%" echo VERSION=%APP_VERSION%
 
 echo ============================================================
-echo Maple PiP Manager v0.9.0-beta - Single EXE Builder
+echo Maple PiP Manager v%APP_VERSION% - Single EXE Builder
 echo ============================================================
 echo.
 echo This window will stay open even if the build fails.
@@ -93,7 +108,7 @@ mkdir "%OUT%" >>"%LOG%" 2>&1
 echo [1/6] Publishing self-contained single EXE...
 >>"%LOG%" echo.
 >>"%LOG%" echo --- dotnet publish ---
-dotnet publish "%PROJECT%" -c Release -r win-x64 --self-contained true -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o "%PUBLISH%" >>"%LOG%" 2>&1
+dotnet publish "%PROJECT%" -c Release -r win-x64 --self-contained true -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -p:Version=%APP_VERSION% -p:InformationalVersion=%APP_VERSION% -o "%PUBLISH%" >>"%LOG%" 2>&1
 if errorlevel 1 (
     echo [FAIL] dotnet publish failed.
     >>"%LOG%" echo [FAIL] dotnet publish returned an error.
