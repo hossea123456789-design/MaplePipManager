@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Version>0.9.1-beta</Version>
+    <AssemblyVersion>0.9.1.0</AssemblyVersion>
+    <FileVersion>0.9.1.0</FileVersion>
+    <InformationalVersion>0.9.1-beta</InformationalVersion>
     <!-- Disable CsWinRT source-generation so builds do not require local Windows SDK UAP Platform.xml.
          The project still consumes the packaged Windows/WinRT projection references from NuGet/SDK. -->
     <CsWinRTEnabled>false</CsWinRTEnabled>
