@@ -7,6 +7,9 @@ namespace CropPipViewer;
 
 public partial class FilterKeysPillWindow : Window
 {
+    public const double FixedWidth = 60;
+    public const double FixedHeight = 20;
+
     private bool _isDragging;
     private bool _suppressToggle;
     private Point _dragStartMouse;
@@ -30,7 +33,25 @@ public partial class FilterKeysPillWindow : Window
     public FilterKeysPillWindow()
     {
         InitializeComponent();
+        EnforceFixedSize();
+        Loaded += (_, _) => EnforceFixedSize();
         UpdateCursorAndTooltipHint();
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        EnforceFixedSize();
+    }
+
+    public void EnforceFixedSize()
+    {
+        MinWidth = FixedWidth;
+        MaxWidth = FixedWidth;
+        Width = FixedWidth;
+        MinHeight = FixedHeight;
+        MaxHeight = FixedHeight;
+        Height = FixedHeight;
     }
 
     private void UpdateCursorAndTooltipHint()

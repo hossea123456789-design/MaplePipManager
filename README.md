@@ -2,7 +2,7 @@
 
 MapleStory 창의 원하는 영역을 잘라 별도의 PiP(Always-on-top overlay)로 배치하는 Windows용 도구입니다.
 
-> 공개 베타: **v0.9.1-beta**  
+> 공개 베타: **v0.9.2-beta**  
 > 내부 개발 기준: **v33c 기반 + 공개 피드백 반영**
 
 ![UI overview](docs/images/ui-overview.png)
@@ -24,6 +24,8 @@ MapleStory 창의 원하는 영역을 잘라 별도의 PiP(Always-on-top overlay
 - GitHub Release 기반 업데이트 확인 및 자동 업데이트
 
 > 기존 `창 크기 연동` 기능은 프리셋 전환 시 표시 크기가 누적 변형될 수 있어 v0.9.1-beta부터 제거했습니다.
+>
+> v0.9.2-beta에서는 자동 실행 시 FilterKeys 알약 PIP 크기 이상과 프리셋 전환 중 크롭/배치 상태가 간헐적으로 손상될 수 있는 경합 조건을 수정했습니다.
 
 ## 설치 / 실행
 

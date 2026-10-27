@@ -2,9 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="FilterKeys Pill" Width="60" Height="20"
+        MinWidth="60" MaxWidth="60" MinHeight="20" MaxHeight="20"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
-        SizeToContent="Manual">
+        SizeToContent="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Border x:Name="PillBorder"
             CornerRadius="10"
             Background="#753131"
