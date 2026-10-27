@@ -136,7 +136,8 @@ public partial class MainWindow : Window
         SetCaptureSpeedComboFromSettings();
         UpdateCaptureSpeedUi();
         UpdateFilterKeysUiFromSettings();
-        UpdateFilterKeysPillVisibility();
+        // The floating FilterKeys pill is created after MainWindow.Loaded so startup/autostart
+        // cannot create it under a temporary/default DPI context.
         UpdateBurstUiFromSettings();
         UpdateBurstMonitorVisibility();
         _filterKeysTimer.Tick += (_, _) =>
@@ -162,7 +163,8 @@ public partial class MainWindow : Window
         PreviewKeyDown += Window_PreviewKeyDown;
         Loaded += (_, _) =>
         {
-            SettingsService.Log("main_loaded | v33_hybrid_burst_verification");
+            SettingsService.Log("main_loaded | v0.9.2_preset_transaction");
+            UpdateFilterKeysPillVisibility();
             UpdateResolutionMatchUi();
             UpdateCropThumbnails(force: true);
         };
@@ -281,7 +283,59 @@ public partial class MainWindow : Window
         preset.BurstWarningThresholdSeconds = ClampBurstWarningSeconds(preset.BurstWarningThresholdSeconds);
         preset.BurstMonitorOpacity = ClampBurstMonitorOpacity(preset.BurstMonitorOpacity);
         preset.BurstMonitorBackgroundOpacity = ClampBurstMonitorBackgroundOpacity(preset.BurstMonitorBackgroundOpacity);
+        preset.ResizeItemsWithWindow = false;
         NormalizePresetTargetSourceSize(preset);
+        NormalizePresetCropLayout(preset);
+        NormalizePresetPlacements(preset);
+    }
+
+    private static void NormalizePresetCropLayout(PipPreset preset)
+    {
+        var usedIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var crop in preset.Crops)
+        {
+            if (string.IsNullOrWhiteSpace(crop.Id) || !usedIds.Add(crop.Id))
+            {
+                crop.Id = Guid.NewGuid().ToString("N");
+                usedIds.Add(crop.Id);
+            }
+
+            crop.Width = Math.Max(1, crop.Width);
+            crop.Height = Math.Max(1, crop.Height);
+            if (!double.IsFinite(crop.DisplayX)) crop.DisplayX = 0;
+            if (!double.IsFinite(crop.DisplayY)) crop.DisplayY = 0;
+            if (!double.IsFinite(crop.DisplayWidth) || crop.DisplayWidth < 4) crop.DisplayWidth = Math.Max(4, crop.Width);
+            if (!double.IsFinite(crop.DisplayHeight) || crop.DisplayHeight < 4) crop.DisplayHeight = Math.Max(4, crop.Height);
+            if (!double.IsFinite(crop.PipOffsetX)) crop.PipOffsetX = 0;
+            if (!double.IsFinite(crop.PipOffsetY)) crop.PipOffsetY = 0;
+            if (!double.IsFinite(crop.RotationAngle)) crop.RotationAngle = 0;
+        }
+    }
+
+    private static void NormalizePresetPlacements(PipPreset preset)
+    {
+        if (!double.IsFinite(preset.OverlayLeft)) preset.OverlayLeft = 1200;
+        if (!double.IsFinite(preset.OverlayTop)) preset.OverlayTop = 700;
+        if (!double.IsFinite(preset.OverlayWidth) || preset.OverlayWidth < 60) preset.OverlayWidth = 360;
+        if (!double.IsFinite(preset.OverlayHeight) || preset.OverlayHeight < 40) preset.OverlayHeight = 220;
+        if (!double.IsFinite(preset.Scale) || preset.Scale < 0.1) preset.Scale = 1.0;
+
+        foreach (var key in preset.PipWindowPlacementsByKey.Keys.ToList())
+        {
+            var placement = preset.PipWindowPlacementsByKey[key];
+            if (placement == null)
+            {
+                preset.PipWindowPlacementsByKey.Remove(key);
+                continue;
+            }
+
+            if (!double.IsFinite(placement.Left)) placement.Left = preset.OverlayLeft;
+            if (!double.IsFinite(placement.Top)) placement.Top = preset.OverlayTop;
+            if (!double.IsFinite(placement.Width) || placement.Width < 60) placement.Width = Math.Max(60, preset.OverlayWidth);
+            if (!double.IsFinite(placement.Height) || placement.Height < 40) placement.Height = Math.Max(40, preset.OverlayHeight);
+            if (!double.IsFinite(placement.BackgroundOpacity)) placement.BackgroundOpacity = preset.PipBackgroundOpacity;
+            placement.BackgroundOpacity = Math.Clamp(placement.BackgroundOpacity, 0, 1);
+        }
     }
 
     private static void NormalizePresetTargetSourceSize(PipPreset preset)
@@ -848,15 +902,21 @@ public partial class MainWindow : Window
 
     private void SwitchPreset(int newIndex)
     {
+        // Persist the outgoing preset first. From this point until the incoming layout is fully
+        // restored, all event-driven persistence is suppressed so intermediate Window events
+        // cannot overwrite the incoming preset's crop/placement state.
         SaveSettings();
         _isSwitchingPreset = true;
         try
         {
             newIndex = Math.Clamp(newIndex, 0, PresetSlotCount - 1);
+            var targetPreset = _settings.Presets[newIndex];
+            SettingsService.Log($"preset_switch_begin | from={_settings.ActivePresetIndex + 1} | to={newIndex + 1} | crops={targetPreset.Crops?.Count ?? 0}");
             _settings.ActivePresetIndex = newIndex;
-            ApplyPresetToRootSettings(_settings.Presets[newIndex]);
+            ApplyPresetToRootSettings(targetPreset);
             LoadCurrentSettingsIntoUiAndOverlays();
             SettingsService.Save(_settings);
+            SettingsService.Log($"preset_switch_complete | slot={newIndex + 1} | crops={_crops.Count} | detached={_detachedOverlays.Count}");
             StatusText.Text = $"프리셋 불러오기: {_settings.Presets[newIndex].DisplayName}";
         }
         finally
@@ -919,10 +979,11 @@ public partial class MainWindow : Window
         if (_overlay != null)
         {
             var mainPlacement = GetSavedPipPlacement(MainPipKey);
-            _overlay.Left = mainPlacement?.Left ?? _settings.OverlayLeft;
-            _overlay.Top = mainPlacement?.Top ?? _settings.OverlayTop;
-            _overlay.Width = Math.Max(60, mainPlacement?.Width ?? _settings.OverlayWidth);
-            _overlay.Height = Math.Max(40, mainPlacement?.Height ?? _settings.OverlayHeight);
+            _overlay.ApplyWindowBoundsWithoutSaving(
+                mainPlacement?.Left ?? _settings.OverlayLeft,
+                mainPlacement?.Top ?? _settings.OverlayTop,
+                mainPlacement?.Width ?? _settings.OverlayWidth,
+                mainPlacement?.Height ?? _settings.OverlayHeight);
             _overlay.SetTargetLockState(mainPlacement?.TargetOffsetX, mainPlacement?.TargetOffsetY, mainPlacement?.TargetBaselineWidth ?? 0, mainPlacement?.TargetBaselineHeight ?? 0);
         }
 
@@ -1342,6 +1403,7 @@ public partial class MainWindow : Window
 
     private void SaveSettings()
     {
+        if (_isSwitchingPreset) return;
         _settings.Crops = _crops.ToList();
         SaveCurrentPipWindowPlacements();
         if (!_isSwitchingPreset && !_isApplyingHistory)
@@ -1397,12 +1459,13 @@ public partial class MainWindow : Window
 
     private void OverlayBoundsChanged(OverlayWindow overlay)
     {
-        if (_isInitializing || _isApplyingHistory) return;
+        if (_isInitializing || _isApplyingHistory || _isSwitchingPreset) return;
         SaveSettingsThrottled();
     }
 
     private void SaveSettingsThrottled()
     {
+        if (_isInitializing || _isApplyingHistory || _isSwitchingPreset) return;
         if ((DateTime.UtcNow - _lastAutoSaveUtc).TotalMilliseconds < 250) return;
         _lastAutoSaveUtc = DateTime.UtcNow;
         SaveSettings();
@@ -1410,11 +1473,12 @@ public partial class MainWindow : Window
 
     private void QueueRefreshAllOverlays()
     {
-        if (_refreshQueued) return;
+        if (_isSwitchingPreset || _refreshQueued) return;
         _refreshQueued = true;
         Dispatcher.BeginInvoke(new Action(() =>
         {
             _refreshQueued = false;
+            if (_isSwitchingPreset) return;
             CleanupEmptyDetachedOverlays();
             RefreshAllOverlays();
         }));
@@ -3140,6 +3204,7 @@ public partial class MainWindow : Window
         }
 
         if (!_filterKeysPillWindow.IsVisible) _filterKeysPillWindow.Show();
+        _filterKeysPillWindow.EnforceFixedSize();
         _filterKeysPillWindow.Topmost = true;
         _filterKeysPillWindow.DragLocked = _settings.FilterKeysPillDragLocked;
         ReapplyFilterKeysPillTopMost(force: true);
