@@ -124,22 +124,23 @@ jobs:
             exit 0
           }
 
-          $notes = @"
-## Maple PiP Manager $tag
-
-### 수정
-- Windows 시작 프로그램/자동 실행 시 FilterKeys 알약 PIP가 비정상적으로 커질 수 있는 문제 수정
-- FilterKeys 알약 PIP를 60×20 크기로 고정하고 메인 창 Loaded 이후 생성하도록 변경
-- 프리셋 전환 중 일부 크롭이 사라지거나 위치/크기가 뒤틀릴 수 있는 저장 경합 수정
-- 프리셋 복원 중 PIP 창 이벤트가 저장값을 덮어쓰지 않도록 원자적 복원 처리
-- 손상된 표시 크기, 중복 Crop ID, 비정상 PIP placement 자동 정규화
-
-### 업데이트
-v0.9.1-beta 사용자는 프로그램의 업데이트 확인 기능을 통해 이 버전으로 자동 업데이트할 수 있습니다.
-"@
+          $notesFile = Join-Path $env:RUNNER_TEMP "release-notes.md"
+          @(
+            "## Maple PiP Manager $tag",
+            "",
+            "### 수정",
+            "- Windows 시작 프로그램/자동 실행 시 FilterKeys 알약 PIP가 비정상적으로 커질 수 있는 문제 수정",
+            "- FilterKeys 알약 PIP를 60×20 크기로 고정하고 메인 창 Loaded 이후 생성하도록 변경",
+            "- 프리셋 전환 중 일부 크롭이 사라지거나 위치/크기가 뒤틀릴 수 있는 저장 경합 수정",
+            "- 프리셋 복원 중 PIP 창 이벤트가 저장값을 덮어쓰지 않도록 원자적 복원 처리",
+            "- 손상된 표시 크기, 중복 Crop ID, 비정상 PIP placement 자동 정규화",
+            "",
+            "### 업데이트",
+            "v0.9.1-beta 사용자는 프로그램의 업데이트 확인 기능을 통해 이 버전으로 자동 업데이트할 수 있습니다."
+          ) | Set-Content -LiteralPath $notesFile -Encoding utf8
 
           gh release create $tag $zip $hashFile `
             --target $env:GITHUB_SHA `
             --title "Maple PiP Manager $tag" `
-            --notes $notes `
+            --notes-file $notesFile `
             --prerelease
