@@ -68,6 +68,9 @@ public partial class OverlayWindow : Window
     private bool _resizeItemsWithWindow;
     private bool _isLoadedForResize;
     private bool _isApplyingWindowScale;
+    // Programmatic preset/layout restoration must not be mistaken for a user drag/resize.
+    // While this flag is set, window-bound persistence and crop-resize side effects are suppressed.
+    private bool _suppressBoundsPersistence;
     private double _lastCanvasWidth;
     private double _lastCanvasHeight;
     private DateTime _lastResizeSaveUtc = DateTime.MinValue;
@@ -1615,6 +1618,13 @@ public partial class OverlayWindow : Window
         var newH = Math.Max(1, CanvasHost.ActualHeight);
         var oldW = Math.Max(1, _lastCanvasWidth);
         var oldH = Math.Max(1, _lastCanvasHeight);
+
+        if (_suppressBoundsPersistence)
+        {
+            _lastCanvasWidth = newW;
+            _lastCanvasHeight = newH;
+            return;
+        }
         if (_resizeItemsWithWindow && (Math.Abs(newW - oldW) > 0.5 || Math.Abs(newH - oldH) > 0.5))
         {
             var sx = newW / oldW;
@@ -1648,6 +1658,7 @@ public partial class OverlayWindow : Window
 
     private void OnOverlayLocationChanged()
     {
+        if (_suppressBoundsPersistence) return;
         SaveWindowBoundsThrottled();
         PipBoundsChanged?.Invoke(this);
         if (!_settings.PipPositionLockedToTarget || _isApplyingTargetLockedPosition) return;
@@ -1660,6 +1671,25 @@ public partial class OverlayWindow : Window
         _targetLockedOffsetY = offsetY;
         _targetLockBaselineWidth = Math.Max(0, baselineWidth);
         _targetLockBaselineHeight = Math.Max(0, baselineHeight);
+    }
+
+    public void ApplyWindowBoundsWithoutSaving(double left, double top, double width, double height)
+    {
+        _suppressBoundsPersistence = true;
+        try
+        {
+            if (double.IsFinite(left)) Left = left;
+            if (double.IsFinite(top)) Top = top;
+            Width = Math.Max(60, double.IsFinite(width) ? width : 60);
+            Height = Math.Max(40, double.IsFinite(height) ? height : 40);
+            UpdateLayout();
+            _lastCanvasWidth = Math.Max(1, CanvasHost.ActualWidth);
+            _lastCanvasHeight = Math.Max(1, CanvasHost.ActualHeight);
+        }
+        finally
+        {
+            _suppressBoundsPersistence = false;
+        }
     }
 
     public void SetPipPositionLockedToTarget(bool enabled, bool captureCurrentPosition)
@@ -1841,7 +1871,7 @@ public partial class OverlayWindow : Window
 
     private void SaveWindowBoundsThrottled()
     {
-        if (!_persistWindowBounds) return;
+        if (_suppressBoundsPersistence || !_persistWindowBounds) return;
         _settings.OverlayLeft = Left;
         _settings.OverlayTop = Top;
         _settings.OverlayWidth = Width;
