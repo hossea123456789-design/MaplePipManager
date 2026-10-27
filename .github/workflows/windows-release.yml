@@ -1,0 +1,145 @@
+name: Windows build and release
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($version)) { throw "VERSION is empty." }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore .\src\CropPipViewer\CropPipViewer.csproj
+
+      - name: Publish self-contained win-x64
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $publish = Join-Path $PWD "artifacts\_singlefile_publish"
+          New-Item -ItemType Directory -Force -Path $publish | Out-Null
+          dotnet publish .\src\CropPipViewer\CropPipViewer.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:SelfContained=true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:PublishTrimmed=false `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -p:Version=$version `
+            -p:InformationalVersion=$version `
+            -o $publish
+
+          $exe = Join-Path $publish "CropPipViewer.exe"
+          if (-not (Test-Path -LiteralPath $exe)) { throw "CropPipViewer.exe was not produced." }
+          $unexpectedDlls = Get-ChildItem -LiteralPath $publish -Filter *.dll -File
+          if ($unexpectedDlls) { throw "Unexpected external DLL(s): $($unexpectedDlls.Name -join ', ')" }
+
+      - name: Package release ZIP and checksum
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $publish = Join-Path $PWD "artifacts\_singlefile_publish"
+          $out = Join-Path $PWD "artifacts\CropPipViewer_v${version}_win-x64"
+          $zip = Join-Path $PWD "artifacts\CropPipViewer_v${version}_win-x64.zip"
+          $hashFile = "$zip.sha256.txt"
+
+          if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
+          if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
+          if (Test-Path -LiteralPath $hashFile) { Remove-Item -LiteralPath $hashFile -Force }
+
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $out "docs") | Out-Null
+
+          Copy-Item -LiteralPath (Join-Path $publish "CropPipViewer.exe") -Destination (Join-Path $out "CropPipViewer.exe") -Force
+          Copy-Item -LiteralPath README.md -Destination (Join-Path $out "docs\README.md") -Force
+          Copy-Item -LiteralPath PRIVACY.md -Destination (Join-Path $out "docs\PRIVACY.md") -Force
+          Copy-Item -LiteralPath docs\USER_GUIDE.md -Destination (Join-Path $out "docs\USER_GUIDE.md") -Force
+          Copy-Item -LiteralPath docs\KNOWN_ISSUES.md -Destination (Join-Path $out "docs\KNOWN_ISSUES.md") -Force
+          Copy-Item -LiteralPath docs\RELEASE_README.txt -Destination (Join-Path $out "docs\FIRST_RUN.txt") -Force
+
+          if (Test-Path -LiteralPath docs\images\ui-overview.png) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $out "docs\images") | Out-Null
+            Copy-Item -LiteralPath docs\images\ui-overview.png -Destination (Join-Path $out "docs\images\ui-overview.png") -Force
+          }
+
+          Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip -CompressionLevel Optimal -Force
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToUpperInvariant()
+          "$hash  $(Split-Path -Leaf $zip)" | Set-Content -LiteralPath $hashFile -Encoding ascii
+
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          "hash=$hashFile" >> $env:GITHUB_OUTPUT
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CropPipViewer_v${{ steps.version.outputs.version }}_win-x64
+          path: |
+            artifacts/CropPipViewer_v${{ steps.version.outputs.version }}_win-x64.zip
+            artifacts/CropPipViewer_v${{ steps.version.outputs.version }}_win-x64.zip.sha256.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub pre-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "v$version"
+          $zip = "artifacts\CropPipViewer_v${version}_win-x64.zip"
+          $hashFile = "$zip.sha256.txt"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag already exists; build verification completed and release step is skipped."
+            exit 0
+          }
+
+          $notes = @"
+## Maple PiP Manager $tag
+
+### 수정
+- Windows 시작 프로그램/자동 실행 시 FilterKeys 알약 PIP가 비정상적으로 커질 수 있는 문제 수정
+- FilterKeys 알약 PIP를 60×20 크기로 고정하고 메인 창 Loaded 이후 생성하도록 변경
+- 프리셋 전환 중 일부 크롭이 사라지거나 위치/크기가 뒤틀릴 수 있는 저장 경합 수정
+- 프리셋 복원 중 PIP 창 이벤트가 저장값을 덮어쓰지 않도록 원자적 복원 처리
+- 손상된 표시 크기, 중복 Crop ID, 비정상 PIP placement 자동 정규화
+
+### 업데이트
+v0.9.1-beta 사용자는 프로그램의 업데이트 확인 기능을 통해 이 버전으로 자동 업데이트할 수 있습니다.
+"@
+
+          gh release create $tag $zip $hashFile `
+            --target $env:GITHUB_SHA `
+            --title "Maple PiP Manager $tag" `
+            --notes $notes `
+            --prerelease
