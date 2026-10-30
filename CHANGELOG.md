@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.4-beta
+
+### 수정
+- 대상 창 콤보박스에 Discord, 카카오톡, Crop PIP, FilterKeys Pill 등 관계없는 창이 노출되던 문제 수정
+- 대상 창 목록을 MapleStory 후보로만 제한
+- 동일 MapleStory 프로세스가 여러 top-level HWND를 노출해 목록에 중복 표시되던 문제 수정
+  - PID당 대표 창 1개만 표시
+  - Process.MainWindowHandle → 정확한 MapleStory 제목 → 가장 큰 클라이언트 영역 순으로 대표 창 우선 선택
+- Maple PiP Manager 자신의 PIP/알약/보조 창은 대상 목록에서 완전히 제외
+- 여러 MapleStory 클라이언트를 동시에 실행한 경우에는 서로 다른 PID별로 1개씩 표시
+
+
 ## v0.9.3-beta
 
 ### 긴급 수정
