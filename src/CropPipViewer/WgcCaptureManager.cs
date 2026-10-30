@@ -55,7 +55,7 @@ public sealed class WgcCaptureManager : IDisposable
 
     public bool StartForWindow(IntPtr hwnd, string? sourceName = null)
     {
-        if (hwnd == IntPtr.Zero) return false;
+        if (hwnd == IntPtr.Zero || !NativeMethods.IsWindow(hwnd)) return false;
 
         var item = CreateItemForWindow(hwnd);
         if (item is null) return false;
@@ -69,15 +69,24 @@ public sealed class WgcCaptureManager : IDisposable
 
     private static GraphicsCaptureItem? CreateItemForWindow(IntPtr hwnd)
     {
+        if (hwnd == IntPtr.Zero || !NativeMethods.IsWindow(hwnd)) return null;
+
         var factory = WinRT.ActivationFactory.Get("Windows.Graphics.Capture.GraphicsCaptureItem");
 
-        // CsWinRT 2.x returns an ObjectReference from As<T>(); that object does not expose
-        // COM methods directly. Convert the activation factory pointer to the COM interop
-        // interface and call CreateForWindow through that interface instead.
+        // IGraphicsCaptureItemInterop::CreateForWindow has native ABI:
+        // HRESULT CreateForWindow(HWND, REFIID, void**).
+        // Keep the HRESULT and result pointer explicit. The old declaration treated the
+        // result pointer as the managed return value, which can surface E_INVALIDARG as
+        // System.ArgumentException on some .NET/WinRT runtime combinations.
         var interop = (IGraphicsCaptureItemInterop)Marshal.GetObjectForIUnknown(factory.ThisPtr);
 
         var iid = GraphicsCaptureItemGuid;
-        var itemPtr = interop.CreateForWindow(hwnd, ref iid);
+        var hr = interop.CreateForWindow(hwnd, ref iid, out var itemPtr);
+        if (hr < 0)
+        {
+            if (itemPtr != IntPtr.Zero) Marshal.Release(itemPtr);
+            Marshal.ThrowExceptionForHR(hr);
+        }
         if (itemPtr == IntPtr.Zero) return null;
 
         try
@@ -97,8 +106,11 @@ public sealed class WgcCaptureManager : IDisposable
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IGraphicsCaptureItemInterop
     {
-        IntPtr CreateForWindow(IntPtr window, ref Guid iid);
-        IntPtr CreateForMonitor(IntPtr monitor, ref Guid iid);
+        [PreserveSig]
+        int CreateForWindow(IntPtr window, ref Guid iid, out IntPtr result);
+
+        [PreserveSig]
+        int CreateForMonitor(IntPtr monitor, ref Guid iid, out IntPtr result);
     }
 
     private void Start(GraphicsCaptureItem item)
