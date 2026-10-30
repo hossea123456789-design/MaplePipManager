@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 
 namespace CropPipViewer;
@@ -6,10 +7,18 @@ public static class WindowService
 {
     public static List<WindowInfo> EnumerateWindows()
     {
-        var list = new List<WindowInfo>();
+        var candidates = new List<WindowCandidate>();
+        var ownPid = Environment.ProcessId;
+
         NativeMethods.EnumWindows((hWnd, _) =>
         {
-            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            if (hWnd == IntPtr.Zero || !NativeMethods.IsWindow(hWnd) || !NativeMethods.IsWindowVisible(hWnd))
+                return true;
+
+            NativeMethods.GetWindowThreadProcessId(hWnd, out var rawPid);
+            var pid = (int)rawPid;
+            if (pid <= 0 || pid == ownPid) return true;
+
             var len = NativeMethods.GetWindowTextLength(hWnd);
             if (len <= 0) return true;
 
@@ -18,14 +27,69 @@ public static class WindowService
             var title = sb.ToString().Trim();
             if (string.IsNullOrWhiteSpace(title)) return true;
 
-            NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
-            list.Add(new WindowInfo { Hwnd = hWnd, Title = title, ProcessId = (int)pid });
+            var processName = TryGetProcessName(pid);
+            var isMapleProcess = processName.Contains("MapleStory", StringComparison.OrdinalIgnoreCase);
+            var isMapleTitle = title.Contains("MapleStory", StringComparison.OrdinalIgnoreCase);
+
+            // This selector is only for the MapleStory WGC source. Do not expose arbitrary
+            // desktop/app/PiP windows here; they are not valid targets for this workflow.
+            if (!isMapleProcess && !isMapleTitle) return true;
+
+            var clientArea = 0L;
+            if (NativeMethods.GetClientRect(hWnd, out var client))
+            {
+                var width = Math.Max(0, client.Width);
+                var height = Math.Max(0, client.Height);
+                clientArea = (long)width * height;
+            }
+
+            var mainWindowHandle = TryGetMainWindowHandle(pid);
+            long score = clientArea;
+            if (hWnd == mainWindowHandle) score += 1_000_000_000_000L;
+            if (string.Equals(title, "MapleStory", StringComparison.OrdinalIgnoreCase)) score += 1_000_000_000L;
+            if (isMapleProcess) score += 100_000_000L;
+
+            candidates.Add(new WindowCandidate(
+                new WindowInfo { Hwnd = hWnd, Title = title, ProcessId = pid },
+                score));
+
             return true;
         }, IntPtr.Zero);
 
-        return list.OrderByDescending(w => w.Title.Contains("MapleStory", StringComparison.OrdinalIgnoreCase))
-                   .ThenBy(w => w.Title)
-                   .ToList();
+        // MapleStory can expose more than one visible top-level HWND for the same process.
+        // Keep only the best representative window per PID (prefer Process.MainWindowHandle,
+        // then the exact MapleStory title, then the largest client area).
+        return candidates
+            .GroupBy(c => c.Info.ProcessId)
+            .Select(g => g.OrderByDescending(c => c.Score).First().Info)
+            .OrderBy(w => w.ProcessId)
+            .ToList();
+    }
+
+    private static string TryGetProcessName(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return process.ProcessName ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static IntPtr TryGetMainWindowHandle(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return process.MainWindowHandle;
+        }
+        catch
+        {
+            return IntPtr.Zero;
+        }
     }
 
     public static bool TryResolveLiveWindow(WindowInfo selected, out WindowInfo live)
@@ -45,15 +109,8 @@ public static class WindowService
                    w.ProcessId == selected.ProcessId &&
                    string.Equals(w.Title, selected.Title, StringComparison.Ordinal))
                ?? windows.FirstOrDefault(w =>
-                   w.ProcessId == selected.ProcessId &&
-                   w.Title.Contains(selected.Title, StringComparison.OrdinalIgnoreCase))
-               ?? windows.FirstOrDefault(w =>
-                   w.ProcessId == selected.ProcessId &&
-                   w.Title.Contains("MapleStory", StringComparison.OrdinalIgnoreCase))
-               ?? windows.FirstOrDefault(w =>
-                   string.Equals(w.Title, selected.Title, StringComparison.Ordinal))
-               ?? windows.FirstOrDefault(w =>
-                   w.Title.Contains("MapleStory", StringComparison.OrdinalIgnoreCase))
+                   w.ProcessId == selected.ProcessId)
+               ?? windows.FirstOrDefault()
                ?? selected;
 
         return live.Hwnd != IntPtr.Zero && NativeMethods.IsWindow(live.Hwnd);
@@ -71,4 +128,6 @@ public static class WindowService
     }
 
     public static bool IsMinimized(IntPtr hwnd) => hwnd != IntPtr.Zero && NativeMethods.IsIconic(hwnd);
+
+    private sealed record WindowCandidate(WindowInfo Info, long Score);
 }
