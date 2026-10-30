@@ -28,6 +28,37 @@ public static class WindowService
                    .ToList();
     }
 
+    public static bool TryResolveLiveWindow(WindowInfo selected, out WindowInfo live)
+    {
+        live = selected;
+        if (selected.Hwnd != IntPtr.Zero && NativeMethods.IsWindow(selected.Hwnd))
+        {
+            NativeMethods.GetWindowThreadProcessId(selected.Hwnd, out var currentPid);
+            if ((int)currentPid == selected.ProcessId)
+            {
+                return true;
+            }
+        }
+
+        var windows = EnumerateWindows();
+        live = windows.FirstOrDefault(w =>
+                   w.ProcessId == selected.ProcessId &&
+                   string.Equals(w.Title, selected.Title, StringComparison.Ordinal))
+               ?? windows.FirstOrDefault(w =>
+                   w.ProcessId == selected.ProcessId &&
+                   w.Title.Contains(selected.Title, StringComparison.OrdinalIgnoreCase))
+               ?? windows.FirstOrDefault(w =>
+                   w.ProcessId == selected.ProcessId &&
+                   w.Title.Contains("MapleStory", StringComparison.OrdinalIgnoreCase))
+               ?? windows.FirstOrDefault(w =>
+                   string.Equals(w.Title, selected.Title, StringComparison.Ordinal))
+               ?? windows.FirstOrDefault(w =>
+                   w.Title.Contains("MapleStory", StringComparison.OrdinalIgnoreCase))
+               ?? selected;
+
+        return live.Hwnd != IntPtr.Zero && NativeMethods.IsWindow(live.Hwnd);
+    }
+
     public static bool TryGetClientScreenRect(IntPtr hwnd, out RectI rect)
     {
         rect = default;

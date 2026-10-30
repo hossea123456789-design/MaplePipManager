@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.3-beta
+
+### 긴급 수정
+- 일부 환경에서 대상 창 선택 시 `GraphicsCaptureItemInterop.CreateForWindow`가 `System.ArgumentException (Value does not fall within the expected range)`으로 실패해 WGC 연결이 되지 않는 문제 수정
+- `IGraphicsCaptureItemInterop::CreateForWindow`를 실제 COM ABI(HRESULT + out pointer)에 맞게 수정
+- 대상 연결 직전에 HWND 유효성과 PID를 다시 확인하고, 오래된 창 핸들이면 현재 MapleStory 창 핸들로 재탐색
+- 연결 실패 시 창 목록을 자동 새로고침하고 재선택할 수 있도록 오류 처리 보강
+
+
 ## v0.9.2-beta
 
 ### 수정

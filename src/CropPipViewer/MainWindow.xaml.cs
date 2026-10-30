@@ -1089,10 +1089,24 @@ public partial class MainWindow : Window
 
     private void SelectTarget_Click(object sender, RoutedEventArgs e)
     {
-        if (WindowCombo.SelectedItem is not WindowInfo info)
+        if (WindowCombo.SelectedItem is not WindowInfo selectedInfo)
         {
             MessageBox.Show("대상 창을 먼저 선택해 주세요.");
             return;
+        }
+
+        if (!WindowService.TryResolveLiveWindow(selectedInfo, out var info))
+        {
+            SettingsService.Log($"target_select_invalid_hwnd | title={selectedInfo.Title} | pid={selectedInfo.ProcessId} | hwnd={selectedInfo.Hwnd}");
+            RefreshWindows();
+            MessageBox.Show("선택한 대상 창이 더 이상 유효하지 않습니다. 창 목록을 새로고침했으니 MapleStory를 다시 선택해 주세요.");
+            return;
+        }
+
+        if (info.Hwnd != selectedInfo.Hwnd)
+        {
+            SettingsService.Log($"target_select_hwnd_refreshed | old={selectedInfo.Hwnd} | new={info.Hwnd} | pid={info.ProcessId}");
+            WindowCombo.SelectedItem = info;
         }
 
         try
@@ -1100,14 +1114,16 @@ public partial class MainWindow : Window
             _capture ??= new WgcCaptureManager();
             if (!_capture.StartForWindow(info.Hwnd, info.Title))
             {
-                MessageBox.Show("대상 창 WGC 캡처 시작에 실패했습니다. MapleStory 창이 켜져 있는지 확인해 주세요.");
+                RefreshWindows();
+                MessageBox.Show("대상 창 WGC 캡처 시작에 실패했습니다. MapleStory 창을 다시 선택해 주세요.");
                 return;
             }
         }
         catch (Exception ex)
         {
-            SettingsService.Log("target_select_capture_exception | " + ex);
-            MessageBox.Show(ex.ToString(), "WGC 캡처 시작 오류");
+            SettingsService.Log($"target_select_capture_exception | title={info.Title} | pid={info.ProcessId} | hwnd={info.Hwnd} | {ex}");
+            RefreshWindows();
+            MessageBox.Show("WGC 대상 연결에 실패했습니다. 창 목록을 새로고침했습니다. MapleStory를 다시 선택한 뒤 재시도해 주세요.\n\n" + ex.Message, "WGC 캡처 시작 오류");
             return;
         }
 
