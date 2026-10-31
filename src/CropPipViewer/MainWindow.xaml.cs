@@ -117,6 +117,7 @@ public partial class MainWindow : Window
         _settings.BurstCalibrationByCropId ??= new Dictionary<string, BurstCalibrationProfile>();
         _settings.CaptureIntervalMs = ClampCaptureInterval(_settings.CaptureIntervalMs);
         InitializeComponent();
+        RestoreMainWindowPosition();
         _crops = new ObservableCollection<CropItem>(_settings.Crops);
         CropGrid.ItemsSource = _crops;
         InitializeCropBorderPaletteUi();
@@ -170,6 +171,7 @@ public partial class MainWindow : Window
         };
         Closing += (_, _) =>
         {
+            SaveMainWindowPosition();
             SaveSettings();
             _thumbnailTimer.Stop();
             _burstMonitorTimer.Stop();
@@ -189,6 +191,53 @@ public partial class MainWindow : Window
             _overlay = null;
             _capture?.Dispose();
         };
+    }
+
+    private void RestoreMainWindowPosition()
+    {
+        if (!_settings.MainWindowLeft.HasValue || !_settings.MainWindowTop.HasValue) return;
+
+        var left = _settings.MainWindowLeft.Value;
+        var top = _settings.MainWindowTop.Value;
+        if (!double.IsFinite(left) || !double.IsFinite(top)) return;
+
+        var virtualLeft = SystemParameters.VirtualScreenLeft;
+        var virtualTop = SystemParameters.VirtualScreenTop;
+        var virtualRight = virtualLeft + SystemParameters.VirtualScreenWidth;
+        var virtualBottom = virtualTop + SystemParameters.VirtualScreenHeight;
+
+        var windowWidth = double.IsFinite(Width) && Width > 0 ? Width : Math.Max(MinWidth, 980);
+        var windowHeight = double.IsFinite(Height) && Height > 0 ? Height : Math.Max(MinHeight, 680);
+        const double minimumVisible = 96;
+
+        // If monitors/resolution changed, do not restore a position that would leave the
+        // manager effectively unreachable. Keep at least a title-bar-sized area visible.
+        var intersectsVirtualDesktop =
+            left + windowWidth >= virtualLeft + minimumVisible &&
+            left <= virtualRight - minimumVisible &&
+            top + windowHeight >= virtualTop + minimumVisible &&
+            top <= virtualBottom - minimumVisible;
+
+        if (!intersectsVirtualDesktop)
+        {
+            SettingsService.Log($"main_window_position_skipped | saved=({left:0.##},{top:0.##}) | virtual=({virtualLeft:0.##},{virtualTop:0.##})-({virtualRight:0.##},{virtualBottom:0.##})");
+            return;
+        }
+
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = left;
+        Top = top;
+        SettingsService.Log($"main_window_position_restored | left={left:0.##} | top={top:0.##}");
+    }
+
+    private void SaveMainWindowPosition()
+    {
+        var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        if (!double.IsFinite(bounds.Left) || !double.IsFinite(bounds.Top)) return;
+
+        _settings.MainWindowLeft = bounds.Left;
+        _settings.MainWindowTop = bounds.Top;
+        SettingsService.Log($"main_window_position_saved | left={bounds.Left:0.##} | top={bounds.Top:0.##}");
     }
 
     private void NormalizePresetsAndLoadActive()
