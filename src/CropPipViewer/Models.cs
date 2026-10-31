@@ -16,6 +16,12 @@ public sealed class AppSettings
 
     public string? LastTargetTitle { get; set; }
     public int LastTargetProcessId { get; set; }
+
+
+    // Global Maple PiP Manager window placement. These are intentionally not part of
+    // per-character/per-purpose presets.
+    public double? MainWindowLeft { get; set; }
+    public double? MainWindowTop { get; set; }
     // WGC source size captured when this preset first records its baseline MapleStory target.
     // This baseline is not overwritten by later target resolution changes. Used only for visibility/matching; crop coordinates are not automatically rescaled.
     public int TargetSourceWidth { get; set; }
