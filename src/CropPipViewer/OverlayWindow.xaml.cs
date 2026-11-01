@@ -1337,6 +1337,17 @@ public partial class OverlayWindow : Window
         e.Handled = true;
     }
 
+    private void Root_LostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (_pipDragStartScreenDip is null) return;
+
+        PipDragCompleted?.Invoke(this);
+        _pipDragStartScreenDip = null;
+        _pipMouseDownScreenDip = null;
+        _pipMouseDownWasSelected = false;
+        _pipDragMoved = false;
+    }
+
     private Point GetMouseScreenDip(MouseEventArgs e)
     {
         var screenPx = PointToScreen(e.GetPosition(this));
