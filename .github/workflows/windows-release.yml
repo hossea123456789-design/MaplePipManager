@@ -62,6 +62,13 @@ jobs:
           $unexpectedDlls = Get-ChildItem -LiteralPath $publish -Filter *.dll -File
           if ($unexpectedDlls) { throw "Unexpected external DLL(s): $($unexpectedDlls.Name -join ', ')" }
 
+      - name: Fetch READY notification sound assets
+        shell: pwsh
+        run: |
+          $soundDir = Join-Path $PWD "artifacts\_sound_assets"
+          if (Test-Path -LiteralPath $soundDir) { Remove-Item -LiteralPath $soundDir -Recurse -Force }
+          .\scripts\FETCH_SOUND_ASSETS.ps1 -OutputDir $soundDir
+
       - name: Package release ZIP and checksum
         id: package
         shell: pwsh
@@ -78,6 +85,7 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           New-Item -ItemType Directory -Force -Path (Join-Path $out "docs") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $out "assets\sounds") | Out-Null
 
           Copy-Item -LiteralPath (Join-Path $publish "CropPipViewer.exe") -Destination (Join-Path $out "CropPipViewer.exe") -Force
           Copy-Item -LiteralPath README.md -Destination (Join-Path $out "docs\README.md") -Force
@@ -85,6 +93,11 @@ jobs:
           Copy-Item -LiteralPath docs\USER_GUIDE.md -Destination (Join-Path $out "docs\USER_GUIDE.md") -Force
           Copy-Item -LiteralPath docs\KNOWN_ISSUES.md -Destination (Join-Path $out "docs\KNOWN_ISSUES.md") -Force
           Copy-Item -LiteralPath docs\RELEASE_README.txt -Destination (Join-Path $out "docs\FIRST_RUN.txt") -Force
+          Copy-Item -LiteralPath docs\THIRD_PARTY_SOUNDS.md -Destination (Join-Path $out "docs\THIRD_PARTY_SOUNDS.md") -Force
+
+          Copy-Item -LiteralPath artifacts\_sound_assets\doorbell.mp3 -Destination (Join-Path $out "assets\sounds\doorbell.mp3") -Force
+          Copy-Item -LiteralPath artifacts\_sound_assets\dog-bark.mp3 -Destination (Join-Path $out "assets\sounds\dog-bark.mp3") -Force
+          Copy-Item -LiteralPath artifacts\_sound_assets\rooster.mp3 -Destination (Join-Path $out "assets\sounds\rooster.mp3") -Force
 
           if (Test-Path -LiteralPath docs\images\ui-overview.png) {
             New-Item -ItemType Directory -Force -Path (Join-Path $out "docs\images") | Out-Null

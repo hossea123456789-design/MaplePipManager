@@ -2,10 +2,13 @@
 
 MapleStory 창의 원하는 영역을 잘라 별도의 PiP(Always-on-top overlay)로 배치하는 Windows용 도구입니다.
 
-> 공개 베타: **v0.9.6-beta**  
+> 공개 베타: **v0.9.7-beta**  
 > 내부 개발 기준: **v33c 기반 + 공개 피드백 반영**
 
 ![UI overview](docs/images/ui-overview.png)
+
+
+> v0.9.7-beta부터 극딜 감지에 역할별 READY 사운드 프리셋(초인종/강아지/닭/AI 음성)을 설정할 수 있습니다. 쿨타임 자연 종료와 실제 쿨 초기화 감지 시 1회 알림합니다.
 
 ## 주요 기능
 

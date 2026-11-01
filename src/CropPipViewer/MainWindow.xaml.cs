@@ -705,6 +705,9 @@ public partial class MainWindow : Window
         preset.SemiBurstTriggerKeyName = _settings.SemiBurstTriggerKeyName ?? string.Empty;
         preset.BurstTriggerKeyName = _settings.BurstTriggerKeyName ?? string.Empty;
         preset.OriginBurstTriggerKeyName = _settings.OriginBurstTriggerKeyName ?? string.Empty;
+        preset.SemiBurstReadySound = _settings.SemiBurstReadySound;
+        preset.BurstReadySound = _settings.BurstReadySound;
+        preset.OriginBurstReadySound = _settings.OriginBurstReadySound;
         preset.BurstWarningThresholdSeconds = ClampBurstWarningSeconds(_settings.BurstWarningThresholdSeconds);
         preset.BurstMonitorOpacity = ClampBurstMonitorOpacity(_settings.BurstMonitorOpacity);
         preset.BurstMonitorBackgroundOpacity = ClampBurstMonitorBackgroundOpacity(_settings.BurstMonitorBackgroundOpacity);
@@ -772,6 +775,9 @@ public partial class MainWindow : Window
         _settings.SemiBurstTriggerKeyName = preset.SemiBurstTriggerKeyName ?? string.Empty;
         _settings.BurstTriggerKeyName = preset.BurstTriggerKeyName ?? string.Empty;
         _settings.OriginBurstTriggerKeyName = preset.OriginBurstTriggerKeyName ?? string.Empty;
+        _settings.SemiBurstReadySound = preset.SemiBurstReadySound;
+        _settings.BurstReadySound = preset.BurstReadySound;
+        _settings.OriginBurstReadySound = preset.OriginBurstReadySound;
         _settings.BurstWarningThresholdSeconds = ClampBurstWarningSeconds(preset.BurstWarningThresholdSeconds);
         _settings.BurstMonitorOpacity = ClampBurstMonitorOpacity(preset.BurstMonitorOpacity);
         _settings.BurstMonitorBackgroundOpacity = ClampBurstMonitorBackgroundOpacity(preset.BurstMonitorBackgroundOpacity);
@@ -3696,6 +3702,9 @@ public partial class MainWindow : Window
             BurstMonitorOpacityText.Text = $"{Math.Round(ClampBurstMonitorOpacity(_settings.BurstMonitorOpacity) * 100):0}%";
             BurstMonitorBackgroundOpacitySlider.Value = ClampBurstMonitorBackgroundOpacity(_settings.BurstMonitorBackgroundOpacity);
             BurstMonitorBackgroundOpacityText.Text = $"{Math.Round(ClampBurstMonitorBackgroundOpacity(_settings.BurstMonitorBackgroundOpacity) * 100):0}%";
+            SelectBurstReadySoundCombo(SemiBurstReadySoundCombo, _settings.SemiBurstReadySound);
+            SelectBurstReadySoundCombo(BurstReadySoundCombo, _settings.BurstReadySound);
+            SelectBurstReadySoundCombo(OriginBurstReadySoundCombo, _settings.OriginBurstReadySound);
             UpdateBurstTriggerKeyUi();
             UpdateBurstRoleComboItems();
         }
@@ -3892,6 +3901,9 @@ public partial class MainWindow : Window
         _settings.SemiBurstTimingCorrectionSeconds = ReadDoubleBox(SemiBurstTimingCorrectionBox, _settings.SemiBurstTimingCorrectionSeconds, 0, 30);
         _settings.BurstTimingCorrectionSeconds = ReadDoubleBox(BurstTimingCorrectionBox, _settings.BurstTimingCorrectionSeconds, 0, 30);
         _settings.OriginBurstTimingCorrectionSeconds = ReadDoubleBox(OriginBurstTimingCorrectionBox, _settings.OriginBurstTimingCorrectionSeconds, 0, 30);
+        _settings.SemiBurstReadySound = ReadBurstReadySoundCombo(SemiBurstReadySoundCombo, _settings.SemiBurstReadySound);
+        _settings.BurstReadySound = ReadBurstReadySoundCombo(BurstReadySoundCombo, _settings.BurstReadySound);
+        _settings.OriginBurstReadySound = ReadBurstReadySoundCombo(OriginBurstReadySoundCombo, _settings.OriginBurstReadySound);
         _settings.BurstWarningThresholdSeconds = ReadDoubleBox(BurstWarningThresholdBox, _settings.BurstWarningThresholdSeconds, 0, 600);
         _settings.BurstMonitorOpacity = ClampBurstMonitorOpacity(BurstMonitorOpacitySlider.Value);
         _settings.BurstMonitorBackgroundOpacity = ClampBurstMonitorBackgroundOpacity(BurstMonitorBackgroundOpacitySlider.Value);
@@ -3906,6 +3918,76 @@ public partial class MainWindow : Window
         _burstMonitorWindow?.SetMonitorOpacity(_settings.BurstMonitorOpacity);
         _burstMonitorWindow?.SetBackgroundOpacity(_settings.BurstMonitorBackgroundOpacity);
         UpdateBurstMonitorStatusText();
+    }
+
+    private void BurstReadySoundCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || _isApplyingHistory || _isUpdatingBurstUi) return;
+        SaveBurstUiToSettings();
+        SaveSettings();
+    }
+
+    private void BurstReadySoundTest_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not string roleText ||
+            !Enum.TryParse<BurstRole>(roleText, out var role) || role == BurstRole.None)
+        {
+            return;
+        }
+
+        SaveBurstUiToSettings();
+        var preset = GetBurstReadySoundPreset(role);
+        if (preset == BurstReadySoundPreset.None)
+        {
+            StatusText.Text = $"{role.ToKoreanName()} READY 사운드가 '사용 안 함'으로 설정되어 있습니다.";
+            return;
+        }
+
+        BurstReadySoundService.Play(role, preset);
+        StatusText.Text = $"{role.ToKoreanName()} 사운드 테스트: {preset.ToKoreanName()}";
+    }
+
+    private void PlayBurstReadySound(BurstRole role, string reason)
+    {
+        var preset = GetBurstReadySoundPreset(role);
+        if (preset == BurstReadySoundPreset.None) return;
+
+        SettingsService.Log($"burst_ready_sound_trigger | role={role} | preset={preset} | reason={reason}");
+        BurstReadySoundService.Play(role, preset);
+    }
+
+    private BurstReadySoundPreset GetBurstReadySoundPreset(BurstRole role) => role switch
+    {
+        BurstRole.SemiBurst => _settings.SemiBurstReadySound,
+        BurstRole.Burst => _settings.BurstReadySound,
+        BurstRole.OriginBurst => _settings.OriginBurstReadySound,
+        _ => BurstReadySoundPreset.None
+    };
+
+    private static void SelectBurstReadySoundCombo(ComboBox combo, BurstReadySoundPreset preset)
+    {
+        foreach (var item in combo.Items.OfType<ComboBoxItem>())
+        {
+            if (item.Tag is string tag && Enum.TryParse<BurstReadySoundPreset>(tag, out var parsed) && parsed == preset)
+            {
+                combo.SelectedItem = item;
+                return;
+            }
+        }
+
+        combo.SelectedIndex = 0;
+    }
+
+    private static BurstReadySoundPreset ReadBurstReadySoundCombo(ComboBox combo, BurstReadySoundPreset fallback)
+    {
+        if (combo.SelectedItem is ComboBoxItem item &&
+            item.Tag is string tag &&
+            Enum.TryParse<BurstReadySoundPreset>(tag, out var preset))
+        {
+            return preset;
+        }
+
+        return fallback;
     }
 
     private static double ReadDoubleBox(TextBox box, double fallback, double min, double max)
@@ -4373,6 +4455,7 @@ public partial class MainWindow : Window
                 state.ReadyWhileCoolingFirstUtc = null;
                 state.ReadyWhileCoolingVotes = 0;
                 SettingsService.Log($"burst_timer_ready_v33 | {role} | crop={crop.Name} | rapid_recast_grace={BurstRapidRecastGraceSeconds:0.0}s");
+                PlayBurstReadySound(role, reason: "timer_ready");
                 // Deliberately continue into visual classification on the same tick.
             }
         }
@@ -4653,6 +4736,7 @@ public partial class MainWindow : Window
 
     private void ForceBurstReadyState(BurstRole role, BurstRoleRuntimeState state, bool visuallyConfirmed, string reason)
     {
+        var hadActiveCooldown = state.LastUsedUtc is not null;
         state.LastUsedUtc = null;
         state.Status = BurstRuntimeStatus.Ready;
         state.ReadyVotes = visuallyConfirmed ? BurstReadyConfirmFrames : 0;
@@ -4667,6 +4751,10 @@ public partial class MainWindow : Window
         state.ArmedFromReady = visuallyConfirmed;
         state.AwaitingVisualReadyRearm = !visuallyConfirmed;
         SettingsService.Log($"burst_force_ready_v33 | {role} | reason={reason} | visually_confirmed={visuallyConfirmed}");
+        if (hadActiveCooldown)
+        {
+            PlayBurstReadySound(role, reason);
+        }
     }
 
     private BurstRoleRuntimeState GetBurstRoleState(BurstRole role)

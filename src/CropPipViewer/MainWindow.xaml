@@ -378,6 +378,56 @@
                                 <CheckBox x:Name="BurstMonitorVisibleCheck" Content="감지 PIP 표시" Style="{StaticResource OptionCheck}" ToolTip="준극딜/극딜/오리진 쿨 상태를 보여주는 별도 PIP를 표시합니다." Checked="BurstMonitorOptionChanged" Unchecked="BurstMonitorOptionChanged"/>
                             </UniformGrid>
 
+                            <TextBlock Text="READY 사운드" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                            <Border BorderBrush="#ccd7df" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="58"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="58"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="준극딜" VerticalAlignment="Center" Margin="0,0,6,6"/>
+                                        <ComboBox x:Name="SemiBurstReadySoundCombo" Grid.Row="0" Grid.Column="1" Height="27" SelectionChanged="BurstReadySoundCombo_SelectionChanged" Margin="0,0,6,6">
+                                            <ComboBoxItem Content="사용 안 함" Tag="None"/>
+                                            <ComboBoxItem Content="초인종" Tag="Doorbell"/>
+                                            <ComboBoxItem Content="강아지 멍멍" Tag="DogBark"/>
+                                            <ComboBoxItem Content="닭 울음" Tag="Rooster"/>
+                                            <ComboBoxItem Content="AI 음성" Tag="Voice"/>
+                                        </ComboBox>
+                                        <Button Grid.Row="0" Grid.Column="2" Content="테스트" Tag="SemiBurst" Height="27" Click="BurstReadySoundTest_Click" Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="극딜" VerticalAlignment="Center" Margin="0,0,6,6"/>
+                                        <ComboBox x:Name="BurstReadySoundCombo" Grid.Row="1" Grid.Column="1" Height="27" SelectionChanged="BurstReadySoundCombo_SelectionChanged" Margin="0,0,6,6">
+                                            <ComboBoxItem Content="사용 안 함" Tag="None"/>
+                                            <ComboBoxItem Content="초인종" Tag="Doorbell"/>
+                                            <ComboBoxItem Content="강아지 멍멍" Tag="DogBark"/>
+                                            <ComboBoxItem Content="닭 울음" Tag="Rooster"/>
+                                            <ComboBoxItem Content="AI 음성 · 극딜 돌았습니다" Tag="Voice"/>
+                                        </ComboBox>
+                                        <Button Grid.Row="1" Grid.Column="2" Content="테스트" Tag="Burst" Height="27" Click="BurstReadySoundTest_Click" Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="오리진" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <ComboBox x:Name="OriginBurstReadySoundCombo" Grid.Row="2" Grid.Column="1" Height="27" SelectionChanged="BurstReadySoundCombo_SelectionChanged" Margin="0,0,6,0">
+                                            <ComboBoxItem Content="사용 안 함" Tag="None"/>
+                                            <ComboBoxItem Content="초인종" Tag="Doorbell"/>
+                                            <ComboBoxItem Content="강아지 멍멍" Tag="DogBark"/>
+                                            <ComboBoxItem Content="닭 울음" Tag="Rooster"/>
+                                            <ComboBoxItem Content="AI 음성" Tag="Voice"/>
+                                        </ComboBox>
+                                        <Button Grid.Row="2" Grid.Column="2" Content="테스트" Tag="OriginBurst" Height="27" Click="BurstReadySoundTest_Click"/>
+                                    </Grid>
+                                    <TextBlock Text="쿨타임이 끝나 READY가 되거나 보스방 초기화 등을 실제 감지해 READY로 복귀할 때 1회 재생합니다. 시작 시 이미 READY인 스킬에는 재생하지 않습니다."
+                                               Foreground="#667" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                </StackPanel>
+                            </Border>
+
                             <TextBlock Text="쿨타임 / 알림" FontWeight="SemiBold" Margin="0,0,0,6"/>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
