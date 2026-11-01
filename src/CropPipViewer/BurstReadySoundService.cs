@@ -34,7 +34,6 @@ public static class BurstReadySoundService
             if (!File.Exists(path))
             {
                 SettingsService.Log($"burst_ready_sound_missing | role={role} | preset={preset} | path={path}");
-                System.Media.SystemSounds.Asterisk.Play();
                 return;
             }
 
@@ -127,7 +126,6 @@ public static class BurstReadySoundService
                 if (voiceType == null)
                 {
                     SettingsService.Log("burst_ready_voice_unavailable | SAPI.SpVoice not found");
-                    System.Media.SystemSounds.Asterisk.Play();
                     return;
                 }
 
