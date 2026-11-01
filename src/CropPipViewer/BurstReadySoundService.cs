@@ -38,7 +38,13 @@ public static class BurstReadySoundService
                 return;
             }
 
-            PlayMediaFile(path, role, preset);
+            var maxDurationMs = preset switch
+            {
+                BurstReadySoundPreset.DogBark => 1200,
+                BurstReadySoundPreset.Rooster => 2800,
+                _ => 3500
+            };
+            PlayMediaFile(path, role, preset, maxDurationMs);
         }
         catch (Exception ex)
         {
@@ -46,7 +52,7 @@ public static class BurstReadySoundService
         }
     }
 
-    private static void PlayMediaFile(string path, BurstRole role, BurstReadySoundPreset preset)
+    private static void PlayMediaFile(string path, BurstRole role, BurstReadySoundPreset preset, int maxDurationMs)
     {
         var player = new MediaPlayer
         {
@@ -85,7 +91,22 @@ public static class BurstReadySoundService
 
         player.Open(new Uri(path, UriKind.Absolute));
         player.Play();
-        SettingsService.Log($"burst_ready_sound_play | role={role} | preset={preset} | file={Path.GetFileName(path)}");
+
+        // Rooster source recordings are longer than a notification needs to be.
+        // Cap playback so READY alerts stay short and do not mask game audio.
+        _ = Task.Delay(Math.Max(500, maxDurationMs)).ContinueWith(_ =>
+        {
+            try
+            {
+                player.Dispatcher.BeginInvoke(new Action(Cleanup));
+            }
+            catch
+            {
+                // Player may already have ended and been cleaned up.
+            }
+        });
+
+        SettingsService.Log($"burst_ready_sound_play | role={role} | preset={preset} | file={Path.GetFileName(path)} | max_ms={maxDurationMs}");
     }
 
     private static void SpeakRoleReady(BurstRole role)
