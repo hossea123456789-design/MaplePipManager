@@ -430,7 +430,7 @@ public partial class OverlayWindow : Window
         ResizeMode = ResizeMode.CanResize;
 
         ApplyPipFrameVisual();
-        if (notifyBoundsChanged) PipBoundsChanged?.Invoke(this);
+        PipBoundsChanged?.Invoke(this);
         if (save) SettingsService.Save(_settings);
     }
 
@@ -1786,7 +1786,7 @@ public partial class OverlayWindow : Window
             _settings.OverlayTargetOffsetY = _targetLockedOffsetY.Value;
         }
 
-        PipBoundsChanged?.Invoke(this);
+        if (notifyBoundsChanged) PipBoundsChanged?.Invoke(this);
         if (save) SettingsService.Save(_settings);
     }
 
