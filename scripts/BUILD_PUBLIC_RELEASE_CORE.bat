@@ -145,11 +145,25 @@ echo [3/6] Creating clean end-user folder...
 copy /y "%PUBLISH%\CropPipViewer.exe" "%OUT%\CropPipViewer.exe" >>"%LOG%" 2>&1
 if errorlevel 1 exit /b 30
 mkdir "%OUT%\docs" >>"%LOG%" 2>&1
+mkdir "%OUT%\assets" >>"%LOG%" 2>&1
+mkdir "%OUT%\assets\sounds" >>"%LOG%" 2>&1
+
+echo [3/6] Fetching public-domain READY sound assets...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\scripts\FETCH_SOUND_ASSETS.ps1" -OutputDir "%ARTIFACTS%\_sound_assets" >>"%LOG%" 2>&1
+if errorlevel 1 (
+    echo [FAIL] READY sound asset download failed.
+    >>"%LOG%" echo [FAIL] FETCH_SOUND_ASSETS.ps1 returned an error.
+    exit /b 31
+)
 copy /y "%ROOT%\README.md" "%OUT%\docs\README.md" >>"%LOG%" 2>&1
 copy /y "%ROOT%\PRIVACY.md" "%OUT%\docs\PRIVACY.md" >>"%LOG%" 2>&1
 copy /y "%ROOT%\docs\USER_GUIDE.md" "%OUT%\docs\USER_GUIDE.md" >>"%LOG%" 2>&1
 copy /y "%ROOT%\docs\KNOWN_ISSUES.md" "%OUT%\docs\KNOWN_ISSUES.md" >>"%LOG%" 2>&1
 copy /y "%ROOT%\docs\RELEASE_README.txt" "%OUT%\docs\FIRST_RUN.txt" >>"%LOG%" 2>&1
+copy /y "%ROOT%\docs\THIRD_PARTY_SOUNDS.md" "%OUT%\docs\THIRD_PARTY_SOUNDS.md" >>"%LOG%" 2>&1
+copy /y "%ARTIFACTS%\_sound_assets\doorbell.mp3" "%OUT%\assets\sounds\doorbell.mp3" >>"%LOG%" 2>&1
+copy /y "%ARTIFACTS%\_sound_assets\dog-bark.mp3" "%OUT%\assets\sounds\dog-bark.mp3" >>"%LOG%" 2>&1
+copy /y "%ARTIFACTS%\_sound_assets\rooster.mp3" "%OUT%\assets\sounds\rooster.mp3" >>"%LOG%" 2>&1
 if exist "%ROOT%\docs\images\ui-overview.png" (
     mkdir "%OUT%\docs\images" >>"%LOG%" 2>&1
     copy /y "%ROOT%\docs\images\ui-overview.png" "%OUT%\docs\images\ui-overview.png" >>"%LOG%" 2>&1
