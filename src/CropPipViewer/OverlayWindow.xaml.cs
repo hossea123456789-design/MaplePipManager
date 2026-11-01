@@ -80,6 +80,7 @@ public partial class OverlayWindow : Window
     private readonly bool _persistWindowBounds;
     private bool _pipSelectedRuntime;
     private bool _pipHoverRuntime;
+    private bool _coordinatedPipDragActive;
     private Point? _pipDragStartScreenDip;
     private Point? _pipMouseDownScreenDip;
     private bool _pipMouseDownWasSelected;
@@ -103,6 +104,9 @@ public partial class OverlayWindow : Window
     public event Action? UndoRequested;
     public event Action? RedoRequested;
     public event Action<OverlayWindow, double, double>? PipMoveRequested;
+    public event Action<OverlayWindow, Point>? PipDragStarted;
+    public event Action<OverlayWindow, Point>? PipDragMoved;
+    public event Action<OverlayWindow>? PipDragCompleted;
     public event Action<OverlayWindow, bool>? PipStackAlignRequested;
     public event Action<OverlayWindow>? PipBoundsChanged;
 
@@ -426,7 +430,7 @@ public partial class OverlayWindow : Window
         ResizeMode = ResizeMode.CanResize;
 
         ApplyPipFrameVisual();
-        PipBoundsChanged?.Invoke(this);
+        if (notifyBoundsChanged) PipBoundsChanged?.Invoke(this);
         if (save) SettingsService.Save(_settings);
     }
 
@@ -1289,6 +1293,10 @@ public partial class OverlayWindow : Window
 
         _pipDragStartScreenDip = _pipMouseDownScreenDip;
         HistoryCheckpointRequested?.Invoke();
+        if (_pipDragStartScreenDip is Point dragStart)
+        {
+            PipDragStarted?.Invoke(this, dragStart);
+        }
         RootBorder.CaptureMouse();
         e.Handled = true;
     }
@@ -1297,9 +1305,6 @@ public partial class OverlayWindow : Window
     {
         if (_pipDragStartScreenDip is null || e.LeftButton != MouseButtonState.Pressed) return;
         var current = GetMouseScreenDip(e);
-        var dx = current.X - _pipDragStartScreenDip.Value.X;
-        var dy = current.Y - _pipDragStartScreenDip.Value.Y;
-        if (Math.Abs(dx) < 0.01 && Math.Abs(dy) < 0.01) return;
 
         if (_pipMouseDownScreenDip is Point start &&
             (Math.Abs(current.X - start.X) >= 2.0 || Math.Abs(current.Y - start.Y) >= 2.0))
@@ -1307,8 +1312,7 @@ public partial class OverlayWindow : Window
             _pipDragMoved = true;
         }
 
-        _pipDragStartScreenDip = current;
-        PipMoveRequested?.Invoke(this, dx, dy);
+        PipDragMoved?.Invoke(this, current);
         e.Handled = true;
     }
 
@@ -1318,6 +1322,7 @@ public partial class OverlayWindow : Window
 
         var releasePoint = GetMouseScreenDip(e);
         var shouldCycle = _pipMouseDownWasSelected && !_pipDragMoved;
+        PipDragCompleted?.Invoke(this);
         _pipDragStartScreenDip = null;
         _pipMouseDownScreenDip = null;
         _pipMouseDownWasSelected = false;
@@ -1329,7 +1334,6 @@ public partial class OverlayWindow : Window
             PipSelectionCycleRequested?.Invoke(this, releasePoint, false);
         }
 
-        SettingsService.Save(_settings);
         e.Handled = true;
     }
 
@@ -1658,7 +1662,7 @@ public partial class OverlayWindow : Window
 
     private void OnOverlayLocationChanged()
     {
-        if (_suppressBoundsPersistence) return;
+        if (_coordinatedPipDragActive || _suppressBoundsPersistence) return;
         SaveWindowBoundsThrottled();
         PipBoundsChanged?.Invoke(this);
         if (!_settings.PipPositionLockedToTarget || _isApplyingTargetLockedPosition) return;
@@ -1671,6 +1675,41 @@ public partial class OverlayWindow : Window
         _targetLockedOffsetY = offsetY;
         _targetLockBaselineWidth = Math.Max(0, baselineWidth);
         _targetLockBaselineHeight = Math.Max(0, baselineHeight);
+    }
+
+    public void BeginCoordinatedPipDrag()
+    {
+        _coordinatedPipDragActive = true;
+    }
+
+    public void ApplyCoordinatedPipDragPosition(double left, double top)
+    {
+        if (!_coordinatedPipDragActive) _coordinatedPipDragActive = true;
+
+        _suppressBoundsPersistence = true;
+        try
+        {
+            if (double.IsFinite(left)) Left = Math.Round(left, 2);
+            if (double.IsFinite(top)) Top = Math.Round(top, 2);
+        }
+        finally
+        {
+            _suppressBoundsPersistence = false;
+        }
+    }
+
+    public void EndCoordinatedPipDrag()
+    {
+        if (!_coordinatedPipDragActive) return;
+        _coordinatedPipDragActive = false;
+
+        // Position-lock offsets are captured exactly once from the final group position.
+        // During the drag, the lock timer is suspended so individual windows cannot snap
+        // against stale offsets and destroy the group's relative layout.
+        if (_settings.PipPositionLockedToTarget)
+        {
+            CaptureTargetRelativePosition(save: false, notifyBoundsChanged: false);
+        }
     }
 
     public void ApplyWindowBoundsWithoutSaving(double left, double top, double width, double height)
@@ -1722,7 +1761,7 @@ public partial class OverlayWindow : Window
         return WindowService.TryGetClientScreenRect(_targetHwnd, out rect) && rect.Width > 0 && rect.Height > 0;
     }
 
-    private void CaptureTargetRelativePosition(bool save)
+    private void CaptureTargetRelativePosition(bool save, bool notifyBoundsChanged = true)
     {
         if (!TryGetTargetClientRect(out var rect)) return;
         _targetLockBaselineWidth = Math.Max(_targetLockBaselineWidth, rect.Width);
@@ -1763,7 +1802,7 @@ public partial class OverlayWindow : Window
 
     private void ApplyTargetLockedPosition()
     {
-        if (!_settings.PipPositionLockedToTarget) return;
+        if (_coordinatedPipDragActive || !_settings.PipPositionLockedToTarget) return;
         if (_targetLockedOffsetX is null || _targetLockedOffsetY is null)
         {
             CaptureTargetRelativePosition(save: _persistWindowBounds);
