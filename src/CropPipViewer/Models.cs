@@ -103,6 +103,10 @@ public sealed class AppSettings
     public string SemiBurstTriggerKeyName { get; set; } = string.Empty;
     public string BurstTriggerKeyName { get; set; } = string.Empty;
     public string OriginBurstTriggerKeyName { get; set; } = string.Empty;
+    // READY notification sound per role. Saved per preset.
+    public BurstReadySoundPreset SemiBurstReadySound { get; set; } = BurstReadySoundPreset.None;
+    public BurstReadySoundPreset BurstReadySound { get; set; } = BurstReadySoundPreset.None;
+    public BurstReadySoundPreset OriginBurstReadySound { get; set; } = BurstReadySoundPreset.None;
     // Remaining seconds below which the monitor shows/flashes "임박". Saved per preset.
     public double BurstWarningThresholdSeconds { get; set; } = 5;
     // Overall opacity of the burst monitor window (text/status pills/background together).
@@ -184,6 +188,9 @@ public sealed class PipPreset
     public string SemiBurstTriggerKeyName { get; set; } = string.Empty;
     public string BurstTriggerKeyName { get; set; } = string.Empty;
     public string OriginBurstTriggerKeyName { get; set; } = string.Empty;
+    public BurstReadySoundPreset SemiBurstReadySound { get; set; } = BurstReadySoundPreset.None;
+    public BurstReadySoundPreset BurstReadySound { get; set; } = BurstReadySoundPreset.None;
+    public BurstReadySoundPreset OriginBurstReadySound { get; set; } = BurstReadySoundPreset.None;
     // Remaining seconds below which the monitor shows/flashes "임박". Saved per preset.
     public double BurstWarningThresholdSeconds { get; set; } = 5;
     // Overall opacity of the burst monitor window (text/status pills/background together).
@@ -247,6 +254,28 @@ public enum BurstRole
     SemiBurst,
     Burst,
     OriginBurst
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum BurstReadySoundPreset
+{
+    None,
+    Doorbell,
+    DogBark,
+    Rooster,
+    Voice
+}
+
+public static class BurstReadySoundPresetExtensions
+{
+    public static string ToKoreanName(this BurstReadySoundPreset preset) => preset switch
+    {
+        BurstReadySoundPreset.Doorbell => "초인종",
+        BurstReadySoundPreset.DogBark => "강아지 멍멍",
+        BurstReadySoundPreset.Rooster => "닭 울음",
+        BurstReadySoundPreset.Voice => "AI 음성",
+        _ => "사용 안 함"
+    };
 }
 
 public static class BurstRoleExtensions
