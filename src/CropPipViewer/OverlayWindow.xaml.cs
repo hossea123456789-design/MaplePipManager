@@ -8,6 +8,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -34,6 +36,9 @@ public partial class OverlayWindow : Window
     private readonly Dictionary<string, Grid> _containers = new();
     private readonly Dictionary<string, Border> _contentBorders = new();
     private readonly Dictionary<string, Shape> _cropBorderShapes = new();
+    private readonly Dictionary<string, Shape> _externalHighlightShapes = new();
+    private readonly Dictionary<string, ImageSource> _lastCropFrameById = new();
+    private readonly HashSet<string> _externalHighlightCropIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Button> _rotateRightButtons = new();
     private readonly Dictionary<string, Button> _rotateLeftButtons = new();
     private readonly HashSet<string> _selectedCropIds = new();
@@ -263,7 +268,12 @@ public partial class OverlayWindow : Window
     {
         if (e.OldItems != null)
         {
-            foreach (CropItem crop in e.OldItems) crop.PropertyChanged -= Crop_PropertyChanged;
+            foreach (CropItem crop in e.OldItems)
+            {
+                crop.PropertyChanged -= Crop_PropertyChanged;
+                _lastCropFrameById.Remove(crop.Id);
+                _externalHighlightCropIds.Remove(crop.Id);
+            }
         }
         if (e.NewItems != null)
         {
@@ -508,6 +518,7 @@ public partial class OverlayWindow : Window
         _containers.Clear();
         _contentBorders.Clear();
         _cropBorderShapes.Clear();
+        _externalHighlightShapes.Clear();
         _rotateRightButtons.Clear();
         _rotateLeftButtons.Clear();
 
@@ -517,6 +528,10 @@ public partial class OverlayWindow : Window
         foreach (var crop in visible)
         {
             var img = new Image { Stretch = Stretch.Fill, SnapsToDevicePixels = true };
+            if (_lastCropFrameById.TryGetValue(crop.Id, out var cachedFrame))
+            {
+                img.Source = cachedFrame;
+            }
             var contentBorder = new Border
             {
                 BorderBrush = Brushes.Transparent,
@@ -529,6 +544,7 @@ public partial class OverlayWindow : Window
             };
 
             var cropBorderShape = BuildCropBorderShape(crop);
+            var externalHighlightShape = BuildExternalHighlightShape(crop);
 
             var rotateLeftButton = BuildRotateButton("↺", HorizontalAlignment.Left, new Thickness(-18, -18, 0, 0), "클릭: 왼쪽 5° 회전\n누르고 유지: 빠르게 계속 회전\nCtrl+클릭/유지: 기존처럼 1° 단위로 세밀 회전");
             var rotateRightButton = BuildRotateButton("↻", HorizontalAlignment.Right, new Thickness(0, -18, -18, 0), "클릭: 오른쪽 5° 회전\n누르고 유지: 빠르게 계속 회전\nCtrl+클릭/유지: 기존처럼 1° 단위로 세밀 회전");
@@ -549,6 +565,7 @@ public partial class OverlayWindow : Window
             };
             host.Children.Add(contentBorder);
             host.Children.Add(cropBorderShape);
+            host.Children.Add(externalHighlightShape);
             host.Children.Add(rotateLeftButton);
             host.Children.Add(rotateRightButton);
             host.MouseLeftButtonDown += (s, e) => BeginDrag(crop, host, e);
@@ -560,6 +577,7 @@ public partial class OverlayWindow : Window
             _containers[crop.Id] = host;
             _contentBorders[crop.Id] = contentBorder;
             _cropBorderShapes[crop.Id] = cropBorderShape;
+            _externalHighlightShapes[crop.Id] = externalHighlightShape;
             _rotateLeftButtons[crop.Id] = rotateLeftButton;
             _rotateRightButtons[crop.Id] = rotateRightButton;
             _images[crop.Id] = img;
@@ -568,7 +586,12 @@ public partial class OverlayWindow : Window
         }
 
         UpdateSelectionVisuals();
+        ApplyExternalCropHighlightVisuals();
         SetPipSelected(_pipSelectedRuntime);
+
+        // A rebuild used to leave brand-new Image controls blank until a later WGC timer tick.
+        // Keep cached frames above and also request a render-priority refresh for new crops.
+        Dispatcher.BeginInvoke(new Action(RequestCaptureRefresh), DispatcherPriority.Render);
     }
 
     private static Button BuildRotateButton(string content, HorizontalAlignment alignment, Thickness margin, string toolTip)
@@ -625,6 +648,12 @@ public partial class OverlayWindow : Window
             UpdateCropBorderShapeGeometry(crop, cropBorderShape, width, height);
             cropBorderShape.RenderTransformOrigin = new Point(0.5, 0.5);
             cropBorderShape.RenderTransform = new RotateTransform(NormalizeAngle(crop.RotationAngle));
+        }
+        if (_externalHighlightShapes.TryGetValue(crop.Id, out var externalHighlightShape))
+        {
+            UpdateCropBorderShapeGeometry(crop, externalHighlightShape, width, height);
+            externalHighlightShape.RenderTransformOrigin = new Point(0.5, 0.5);
+            externalHighlightShape.RenderTransform = new RotateTransform(NormalizeAngle(crop.RotationAngle));
         }
 
         var basePoint = GetBasePipPosition(crop);
@@ -780,6 +809,90 @@ public partial class OverlayWindow : Window
         catch
         {
             return (Color)ColorConverter.ConvertFromString("#00FF7F");
+        }
+    }
+
+    public void SetExternalCropHighlights(IEnumerable<string> cropIds)
+    {
+        _externalHighlightCropIds.Clear();
+        foreach (var id in cropIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal))
+        {
+            _externalHighlightCropIds.Add(id);
+        }
+        ApplyExternalCropHighlightVisuals();
+    }
+
+    public void ClearExternalCropHighlights()
+    {
+        if (_externalHighlightCropIds.Count == 0 && _externalHighlightShapes.Count == 0) return;
+        _externalHighlightCropIds.Clear();
+        ApplyExternalCropHighlightVisuals();
+    }
+
+    private static Shape BuildExternalHighlightShape(CropItem crop)
+    {
+        Shape shape = crop.Shape switch
+        {
+            CropShape.Circle => new Ellipse(),
+            CropShape.Diamond => new Polygon(),
+            _ => new Rectangle()
+        };
+        shape.Fill = Brushes.Transparent;
+        shape.Stroke = new SolidColorBrush(Color.FromRgb(72, 255, 226));
+        shape.StrokeThickness = 2.4;
+        shape.Opacity = 0;
+        shape.Visibility = Visibility.Collapsed;
+        shape.IsHitTestVisible = false;
+        shape.SnapsToDevicePixels = true;
+        shape.Effect = new DropShadowEffect
+        {
+            Color = Color.FromRgb(50, 255, 210),
+            BlurRadius = 14,
+            ShadowDepth = 0,
+            Opacity = 0.95
+        };
+        Panel.SetZIndex(shape, 30);
+        return shape;
+    }
+
+    private void ApplyExternalCropHighlightVisuals()
+    {
+        foreach (var pair in _externalHighlightShapes)
+        {
+            var crop = _crops.FirstOrDefault(c => string.Equals(c.Id, pair.Key, StringComparison.Ordinal));
+            var shape = pair.Value;
+            var shouldHighlight = crop != null && crop.Enabled && _externalHighlightCropIds.Contains(pair.Key);
+
+            shape.BeginAnimation(UIElement.OpacityProperty, null);
+            shape.BeginAnimation(Shape.StrokeThicknessProperty, null);
+
+            if (!shouldHighlight)
+            {
+                shape.Visibility = Visibility.Collapsed;
+                shape.Opacity = 0;
+                continue;
+            }
+
+            shape.Visibility = Visibility.Visible;
+
+            var opacityPulse = new DoubleAnimation
+            {
+                From = 0.30,
+                To = 1.0,
+                Duration = TimeSpan.FromMilliseconds(480),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            var thicknessPulse = new DoubleAnimation
+            {
+                From = 1.6,
+                To = 3.6,
+                Duration = TimeSpan.FromMilliseconds(480),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            shape.BeginAnimation(UIElement.OpacityProperty, opacityPulse, HandoffBehavior.SnapshotAndReplace);
+            shape.BeginAnimation(Shape.StrokeThicknessProperty, thicknessPulse, HandoffBehavior.SnapshotAndReplace);
         }
     }
 
@@ -960,7 +1073,11 @@ public partial class OverlayWindow : Window
                     continue;
                 }
                 var source = _capture.GetLatestCrop(new Int32Rect(crop.X, crop.Y, crop.Width, crop.Height));
-                if (source != null) image.Source = source;
+                if (source != null)
+                {
+                    _lastCropFrameById[crop.Id] = source;
+                    image.Source = source;
+                }
                 if (_containers.TryGetValue(crop.Id, out var host)) LayoutCrop(crop, host);
             }
         }
