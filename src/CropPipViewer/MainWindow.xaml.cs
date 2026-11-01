@@ -165,6 +165,8 @@ public partial class MainWindow : Window
         UpdateCropBorderEditorUi();
         _isInitializing = false;
         PreviewKeyDown += Window_PreviewKeyDown;
+        Activated += (_, _) => UpdateGridCropLocationHighlights();
+        Deactivated += (_, _) => ClearGridCropLocationHighlights();
         Loaded += (_, _) =>
         {
             SettingsService.Log("main_loaded | v0.9.2_preset_transaction");
@@ -1557,9 +1559,61 @@ public partial class MainWindow : Window
 
     private void RefreshAllOverlays()
     {
+        EnsureDetachedOverlaysForExistingGroups();
         _overlay?.RefreshItems();
         foreach (var detached in _detachedOverlays.Values.ToList()) detached.RefreshItems();
         ApplyDetachedPipSelectionVisuals();
+        if (IsActive) UpdateGridCropLocationHighlights();
+    }
+
+    private void EnsureDetachedOverlaysForExistingGroups()
+    {
+        var hasMissingGroup = _crops
+            .Where(c => c.Enabled && !string.IsNullOrWhiteSpace(c.DetachedGroupIdRuntime))
+            .Select(c => c.DetachedGroupIdRuntime!)
+            .Distinct(StringComparer.Ordinal)
+            .Any(groupId => !_detachedOverlays.ContainsKey(groupId));
+
+        if (!hasMissingGroup) return;
+
+        SettingsService.Log("crop_group_overlay_self_heal | missing detached overlay detected");
+        SyncDetachedOverlaysWithCurrentCropGroups();
+    }
+
+    private void UpdateGridCropLocationHighlights()
+    {
+        if (!IsActive || CropGrid == null)
+        {
+            ClearGridCropLocationHighlights();
+            return;
+        }
+
+        var selectedIds = GetSelectedGridCrops()
+            .Where(c => c.Enabled)
+            .Select(c => c.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (selectedIds.Count == 0)
+        {
+            ClearGridCropLocationHighlights();
+            return;
+        }
+
+        EnsureDetachedOverlaysForExistingGroups();
+        foreach (var overlay in GetAllOverlays().ToList())
+        {
+            overlay.SetExternalCropHighlights(selectedIds);
+        }
+    }
+
+    private void ClearGridCropLocationHighlights()
+    {
+        foreach (var overlay in GetAllOverlays().ToList())
+        {
+            overlay.ClearExternalCropHighlights();
+        }
     }
 
     private static int ClampCaptureInterval(int intervalMs) => Math.Clamp(intervalMs, 16, 1000);
@@ -2914,7 +2968,10 @@ public partial class MainWindow : Window
     private void CropGrid_CurrentCellChanged(object sender, EventArgs e)
     {
         if (_isInitializing || _isApplyingHistory) return;
-        RefreshAllOverlays();
+
+        // CropItem.PropertyChanged already updates only the affected layout/source state.
+        // Rebuilding every overlay here used to destroy all Image controls and recreate
+        // them with null Source, which could make an individual crop appear missing.
         SaveSettingsThrottled();
     }
 
@@ -2941,6 +2998,7 @@ public partial class MainWindow : Window
         }
 
         UpdateCropBorderEditorUi();
+        UpdateGridCropLocationHighlights();
     }
 
     private string GetUserVisiblePipName(string? groupId)
