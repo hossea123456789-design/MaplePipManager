@@ -25,6 +25,9 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, OverlayWindow> _detachedOverlays = new();
     // PiP selection order matters: Shift-first selected PiP is the anchor for stack alignment.
     private readonly List<string> _selectedPipKeys = new();
+    private OverlayWindow? _activePipDragSource;
+    private Point? _activePipDragStartCursor;
+    private readonly Dictionary<string, Point> _activePipDragStartPositions = new();
     private bool _isUpdatingPipSelector;
     private CropTemplate? _copiedCropTemplate;
     private CropBorderStyleTemplate? _copiedCropBorderStyle;
@@ -162,6 +165,8 @@ public partial class MainWindow : Window
         UpdateCropBorderEditorUi();
         _isInitializing = false;
         PreviewKeyDown += Window_PreviewKeyDown;
+        Activated += (_, _) => UpdateGridCropLocationHighlights();
+        Deactivated += (_, _) => ClearGridCropLocationHighlights();
         Loaded += (_, _) =>
         {
             SettingsService.Log("main_loaded | v0.9.2_preset_transaction");
@@ -1324,6 +1329,9 @@ public partial class MainWindow : Window
         overlay.UndoRequested += UndoLastAction;
         overlay.RedoRequested += RedoLastAction;
         overlay.PipMoveRequested += MoveSelectedPipsBy;
+        overlay.PipDragStarted += BeginSelectedPipDrag;
+        overlay.PipDragMoved += UpdateSelectedPipDrag;
+        overlay.PipDragCompleted += EndSelectedPipDrag;
         overlay.PipStackAlignRequested += AlignSelectedPipsVertically;
         overlay.PipBoundsChanged += OverlayBoundsChanged;
     }
@@ -1551,9 +1559,61 @@ public partial class MainWindow : Window
 
     private void RefreshAllOverlays()
     {
+        EnsureDetachedOverlaysForExistingGroups();
         _overlay?.RefreshItems();
         foreach (var detached in _detachedOverlays.Values.ToList()) detached.RefreshItems();
         ApplyDetachedPipSelectionVisuals();
+        if (IsActive) UpdateGridCropLocationHighlights();
+    }
+
+    private void EnsureDetachedOverlaysForExistingGroups()
+    {
+        var hasMissingGroup = _crops
+            .Where(c => c.Enabled && !string.IsNullOrWhiteSpace(c.DetachedGroupIdRuntime))
+            .Select(c => c.DetachedGroupIdRuntime!)
+            .Distinct(StringComparer.Ordinal)
+            .Any(groupId => !_detachedOverlays.ContainsKey(groupId));
+
+        if (!hasMissingGroup) return;
+
+        SettingsService.Log("crop_group_overlay_self_heal | missing detached overlay detected");
+        SyncDetachedOverlaysWithCurrentCropGroups();
+    }
+
+    private void UpdateGridCropLocationHighlights()
+    {
+        if (!IsActive || CropGrid == null)
+        {
+            ClearGridCropLocationHighlights();
+            return;
+        }
+
+        var selectedIds = GetSelectedGridCrops()
+            .Where(c => c.Enabled)
+            .Select(c => c.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (selectedIds.Count == 0)
+        {
+            ClearGridCropLocationHighlights();
+            return;
+        }
+
+        EnsureDetachedOverlaysForExistingGroups();
+        foreach (var overlay in GetAllOverlays().ToList())
+        {
+            overlay.SetExternalCropHighlights(selectedIds);
+        }
+    }
+
+    private void ClearGridCropLocationHighlights()
+    {
+        foreach (var overlay in GetAllOverlays().ToList())
+        {
+            overlay.ClearExternalCropHighlights();
+        }
     }
 
     private static int ClampCaptureInterval(int intervalMs) => Math.Clamp(intervalMs, 16, 1000);
@@ -2085,6 +2145,89 @@ public partial class MainWindow : Window
         RefreshAllOverlays();
         SaveSettings();
         StatusText.Text = $"선택한 PIP {selectedGroups.Count}개 병합 완료";
+    }
+
+    private void BeginSelectedPipDrag(OverlayWindow sourceOverlay, Point startCursor)
+    {
+        // If a previous capture ended abnormally, finalize it before starting a new drag.
+        if (_activePipDragSource != null)
+        {
+            EndSelectedPipDrag(_activePipDragSource);
+        }
+
+        var sourceKey = GetPipKey(sourceOverlay);
+        if (!_selectedPipKeys.Contains(sourceKey))
+        {
+            _selectedPipKeys.Clear();
+            _selectedPipKeys.Add(sourceKey);
+            ApplyDetachedPipSelectionVisuals();
+        }
+
+        var targets = _selectedPipKeys
+            .Select(key => new { Key = key, Overlay = GetOverlayByPipKey(key) })
+            .Where(x => x.Overlay != null)
+            .Select(x => new { x.Key, Overlay = x.Overlay! })
+            .DistinctBy(x => x.Key)
+            .ToList();
+
+        if (targets.Count == 0)
+        {
+            targets.Add(new { Key = sourceKey, Overlay = sourceOverlay });
+        }
+
+        _activePipDragSource = sourceOverlay;
+        _activePipDragStartCursor = startCursor;
+        _activePipDragStartPositions.Clear();
+
+        foreach (var target in targets)
+        {
+            _activePipDragStartPositions[target.Key] = new Point(target.Overlay.Left, target.Overlay.Top);
+            target.Overlay.BeginCoordinatedPipDrag();
+        }
+    }
+
+    private void UpdateSelectedPipDrag(OverlayWindow sourceOverlay, Point currentCursor)
+    {
+        if (!ReferenceEquals(_activePipDragSource, sourceOverlay) || _activePipDragStartCursor is null)
+        {
+            BeginSelectedPipDrag(sourceOverlay, currentCursor);
+            return;
+        }
+
+        var dx = currentCursor.X - _activePipDragStartCursor.Value.X;
+        var dy = currentCursor.Y - _activePipDragStartCursor.Value.Y;
+
+        foreach (var pair in _activePipDragStartPositions)
+        {
+            var overlay = GetOverlayByPipKey(pair.Key);
+            if (overlay == null) continue;
+
+            // Absolute positioning from the drag-start snapshot keeps every selected PIP
+            // on exactly the same translation, even if intermediate MouseMove/Window
+            // messages are dropped or delivered at different rates.
+            overlay.ApplyCoordinatedPipDragPosition(
+                pair.Value.X + dx,
+                pair.Value.Y + dy);
+        }
+    }
+
+    private void EndSelectedPipDrag(OverlayWindow sourceOverlay)
+    {
+        if (_activePipDragSource == null) return;
+        if (!ReferenceEquals(_activePipDragSource, sourceOverlay)) return;
+
+        foreach (var key in _activePipDragStartPositions.Keys.ToList())
+        {
+            GetOverlayByPipKey(key)?.EndCoordinatedPipDrag();
+        }
+
+        _activePipDragSource = null;
+        _activePipDragStartCursor = null;
+        _activePipDragStartPositions.Clear();
+
+        // Persist the final group geometry once. Avoiding per-frame saves also removes
+        // another source of event-loop contention during fast multi-window dragging.
+        SaveSettings();
     }
 
     private void MoveSelectedPipsBy(OverlayWindow sourceOverlay, double dx, double dy)
@@ -2825,7 +2968,10 @@ public partial class MainWindow : Window
     private void CropGrid_CurrentCellChanged(object sender, EventArgs e)
     {
         if (_isInitializing || _isApplyingHistory) return;
-        RefreshAllOverlays();
+
+        // CropItem.PropertyChanged already updates only the affected layout/source state.
+        // Rebuilding every overlay here used to destroy all Image controls and recreate
+        // them with null Source, which could make an individual crop appear missing.
         SaveSettingsThrottled();
     }
 
@@ -2852,6 +2998,7 @@ public partial class MainWindow : Window
         }
 
         UpdateCropBorderEditorUi();
+        UpdateGridCropLocationHighlights();
     }
 
     private string GetUserVisiblePipName(string? groupId)

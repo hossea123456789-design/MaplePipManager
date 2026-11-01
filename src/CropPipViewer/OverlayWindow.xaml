@@ -5,7 +5,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="CanResize" MinWidth="80" MinHeight="60" ShowInTaskbar="False" Topmost="True"
         Focusable="True" PreviewKeyDown="Window_PreviewKeyDown">
-    <Border x:Name="RootBorder" Background="#22000000" BorderBrush="#33FFFFFF" BorderThickness="0.6" CornerRadius="2" MouseLeftButtonDown="Root_MouseLeftButtonDown" MouseMove="Root_MouseMove" MouseLeftButtonUp="Root_MouseLeftButtonUp" MouseRightButtonDown="Root_MouseRightButtonDown">
+    <Border x:Name="RootBorder" Background="#22000000" BorderBrush="#33FFFFFF" BorderThickness="0.6" CornerRadius="2" MouseLeftButtonDown="Root_MouseLeftButtonDown" MouseMove="Root_MouseMove" MouseLeftButtonUp="Root_MouseLeftButtonUp" LostMouseCapture="Root_LostMouseCapture" MouseRightButtonDown="Root_MouseRightButtonDown">
         <Grid ClipToBounds="True" Background="#01000000">
             <Canvas x:Name="CanvasHost" ClipToBounds="True" Background="Transparent"/>
             <Border x:Name="PerformanceStatsBorder"

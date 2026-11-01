@@ -2,7 +2,7 @@
 
 MapleStory 창의 원하는 영역을 잘라 별도의 PiP(Always-on-top overlay)로 배치하는 Windows용 도구입니다.
 
-> 공개 베타: **v0.9.5-beta**  
+> 공개 베타: **v0.9.6-beta**  
 > 내부 개발 기준: **v33c 기반 + 공개 피드백 반영**
 
 ![UI overview](docs/images/ui-overview.png)
