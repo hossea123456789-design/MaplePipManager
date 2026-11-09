@@ -2,7 +2,7 @@
 
 MapleStory 창의 원하는 영역을 잘라 별도의 PiP(Always-on-top overlay)로 배치하는 Windows용 도구입니다.
 
-> 공개 베타: **v0.9.9-beta**  
+> 공개 베타: **v0.9.10-beta**  
 > 내부 개발 기준: **v33c 기반 + 공개 피드백 반영**
 
 ![UI overview](docs/images/ui-overview.png)
@@ -113,3 +113,7 @@ dotnet build .\src\CropPipViewer\CropPipViewer.csproj -c Release
 
 ### PIP 표시/숨김 알약
 PIP 탭에서 `PIP 표시/숨김 알약 표시`를 켜면 화면 위의 작은 알약으로 모든 PIP를 빠르게 숨기거나 다시 표시할 수 있습니다. 위치와 노출 여부는 프리셋별로 저장됩니다. `PIP 숨김 시 필터키도 함께 OFF`를 켜면 숨길 당시 필터키가 ON인 경우에만 임시 OFF했다가 PIP 표시 시 복원하며, 원래 OFF였던 필터키는 계속 OFF로 유지됩니다.
+
+
+### PIP 알약 우클릭 프리셋 전환
+PIP 표시/숨김 알약에서 **우클릭**하면 P1~P6 프리셋 목록이 표시됩니다. 현재 프리셋은 체크되고, 다른 항목을 누르면 메인 프로그램을 열지 않고도 바로 프리셋을 전환할 수 있습니다.
