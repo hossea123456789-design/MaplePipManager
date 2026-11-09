@@ -49,7 +49,7 @@
                     <ComboBox x:Name="WindowCombo" MinWidth="360" Width="420" Height="30" DisplayMemberPath="Title" Margin="0,0,8,6"/>
                     <Button Content="새로고침" Width="80" Style="{StaticResource SmallButton}" Click="RefreshWindows_Click"/>
                     <Button Content="대상 선택" Width="90" Style="{StaticResource SmallButton}" Click="SelectTarget_Click"/>
-                    <Button Content="PiP 표시/숨김" Width="110" Style="{StaticResource SmallButton}" Click="ToggleOverlay_Click"/>
+                    <Button x:Name="ToggleOverlayButton" Content="PiP 숨김" Width="110" Style="{StaticResource SmallButton}" Click="ToggleOverlay_Click" ToolTip="현재 PIP 상태에 맞춰 전체 PIP를 표시하거나 숨깁니다."/>
                     <Button Content="필터키만 표시" Width="105" Style="{StaticResource SmallButton}" Click="ShowFilterKeysPillOnly_Click" ToolTip="일반 PIP는 숨기고 필터키 알약 PIP 버튼만 표시합니다."/>
                 </WrapPanel>
             </DockPanel>

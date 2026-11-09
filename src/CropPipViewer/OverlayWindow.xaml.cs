@@ -93,6 +93,10 @@ public partial class OverlayWindow : Window
     private double _pipBackgroundOpacity;
     private double _cropOpacity = 0.92;
     private bool _refreshQueued;
+    private int _itemRefreshGeneration;
+    private int _bulkCropReloadDepth;
+    private bool _refreshRequestedDuringBulkReload;
+    private bool _forceCaptureRefreshPending;
     private double? _targetLockedOffsetX;
     private double? _targetLockedOffsetY;
     private int _targetLockBaselineWidth;
@@ -307,13 +311,115 @@ public partial class OverlayWindow : Window
         }
     }
 
+    public void BeginBulkCropReload()
+    {
+        _bulkCropReloadDepth++;
+        _itemRefreshGeneration++;
+        _refreshQueued = false;
+        _refreshRequestedDuringBulkReload = false;
+        _forceCaptureRefreshPending = false;
+
+        // Never show a cached frame from a different preset while the new preset is being rebound.
+        _lastCropFrameById.Clear();
+    }
+
+    public void EndBulkCropReload(bool refreshNow)
+    {
+        if (_bulkCropReloadDepth <= 0) return;
+
+        _bulkCropReloadDepth--;
+        if (_bulkCropReloadDepth > 0) return;
+
+        // Invalidate every Dispatcher callback that was queued before/during the preset transaction.
+        _itemRefreshGeneration++;
+        _refreshQueued = false;
+        var hadDeferredRefresh = _refreshRequestedDuringBulkReload;
+        _refreshRequestedDuringBulkReload = false;
+
+        if (refreshNow || hadDeferredRefresh)
+        {
+            RefreshItemsAndCaptureNow();
+        }
+    }
+
+    public void RefreshItemsAndCaptureNow()
+    {
+        if (_bulkCropReloadDepth > 0)
+        {
+            _refreshRequestedDuringBulkReload = true;
+            _forceCaptureRefreshPending = true;
+            return;
+        }
+
+        RefreshItems();
+        ForceCaptureRefresh();
+    }
+
+    public async void VerifyCropBindingsAfterPresetSwitch()
+    {
+        try
+        {
+            // The latest WGC frame can arrive a little after the preset UI transaction.
+            // Retry only when an enabled crop still has no Image Source, so normal rendering
+            // does not pay any additional refresh cost.
+            foreach (var delayMs in new[] { 40, 120, 300 })
+            {
+                await Task.Delay(delayMs);
+                if (_allowClose || _bulkCropReloadDepth > 0) return;
+
+                var missing = GetVisibleCrops()
+                    .Where(crop => crop.Enabled)
+                    .Where(crop => !_images.TryGetValue(crop.Id, out var image) || image.Source == null)
+                    .Select(crop => crop.Id)
+                    .ToList();
+
+                if (missing.Count == 0) return;
+
+                SettingsService.Log($"preset_crop_binding_retry | group={_detachedGroupId ?? "main"} | missing={string.Join(",", missing)} | delay_ms={delayMs}");
+                ForceCaptureRefresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            SettingsService.Log($"preset_crop_binding_retry_exception | group={_detachedGroupId ?? "main"} | {ex}");
+        }
+    }
+
+    public void ForceCaptureRefresh()
+    {
+        if (_bulkCropReloadDepth > 0)
+        {
+            _forceCaptureRefreshPending = true;
+            return;
+        }
+
+        _forceCaptureRefreshPending = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_bulkCropReloadDepth > 0) return;
+            if (_captureRefreshRunning) return;
+
+            _forceCaptureRefreshPending = false;
+            _lastCaptureRefreshUtc = DateTime.MinValue;
+            RefreshCaptureFrameNow();
+        }), DispatcherPriority.Render);
+    }
+
     private void QueueRefreshItems()
     {
+        if (_bulkCropReloadDepth > 0)
+        {
+            _refreshRequestedDuringBulkReload = true;
+            return;
+        }
+
         if (_refreshQueued) return;
         _refreshQueued = true;
+        var generation = _itemRefreshGeneration;
         Dispatcher.BeginInvoke(new Action(() =>
         {
             _refreshQueued = false;
+            if (generation != _itemRefreshGeneration || _bulkCropReloadDepth > 0) return;
             RefreshItems();
         }), DispatcherPriority.Background);
     }
@@ -330,6 +436,7 @@ public partial class OverlayWindow : Window
         _capture.FrameUpdated += Capture_FrameUpdated;
         _targetHwnd = targetHwnd;
         SettingsService.Log($"overlay_capture_set | WGC | hwnd={targetHwnd} | size={capture.SourceWidth}x{capture.SourceHeight}");
+        ForceCaptureRefresh();
     }
 
     public void SetCaptureRefreshOptions(int intervalMs, bool useFrameArrivedRefresh, bool showPerformanceStats)
@@ -513,6 +620,12 @@ public partial class OverlayWindow : Window
 
     public void RefreshItems()
     {
+        if (_bulkCropReloadDepth > 0)
+        {
+            _refreshRequestedDuringBulkReload = true;
+            return;
+        }
+
         CanvasHost.Children.Clear();
         _images.Clear();
         _containers.Clear();
@@ -590,8 +703,9 @@ public partial class OverlayWindow : Window
         SetPipSelected(_pipSelectedRuntime);
 
         // A rebuild used to leave brand-new Image controls blank until a later WGC timer tick.
-        // Keep cached frames above and also request a render-priority refresh for new crops.
-        Dispatcher.BeginInvoke(new Action(RequestCaptureRefresh), DispatcherPriority.Render);
+        // Keep cached frames above and force the newly created Image controls to bind to the
+        // latest WGC frame immediately, bypassing the normal interval throttle.
+        ForceCaptureRefresh();
     }
 
     private static Button BuildRotateButton(string content, HorizontalAlignment alignment, Thickness margin, string toolTip)
@@ -1023,7 +1137,16 @@ public partial class OverlayWindow : Window
 
     private void RefreshCaptureFrameNow()
     {
-        if (_captureRefreshRunning) return;
+        if (_bulkCropReloadDepth > 0)
+        {
+            _forceCaptureRefreshPending = true;
+            return;
+        }
+        if (_captureRefreshRunning)
+        {
+            _forceCaptureRefreshPending = true;
+            return;
+        }
         if (_capture == null || !_capture.IsCapturing || !IsVisible) return;
 
         _captureRefreshRunning = true;
@@ -1086,6 +1209,17 @@ public partial class OverlayWindow : Window
             sw.Stop();
             UpdateCapturePerformanceStats(sw.Elapsed.TotalMilliseconds);
             _captureRefreshRunning = false;
+
+            if (_forceCaptureRefreshPending && _bulkCropReloadDepth == 0)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (_bulkCropReloadDepth > 0 || _captureRefreshRunning) return;
+                    _forceCaptureRefreshPending = false;
+                    _lastCaptureRefreshUtc = DateTime.MinValue;
+                    RefreshCaptureFrameNow();
+                }), DispatcherPriority.Render);
+            }
         }
     }
 
