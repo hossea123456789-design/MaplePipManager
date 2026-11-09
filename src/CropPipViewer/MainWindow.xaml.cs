@@ -140,14 +140,16 @@ public partial class MainWindow : Window
         SetCaptureSpeedComboFromSettings();
         UpdateCaptureSpeedUi();
         UpdateFilterKeysUiFromSettings();
-        // The floating FilterKeys pill is created after MainWindow.Loaded so startup/autostart
-        // cannot create it under a temporary/default DPI context.
+        UpdatePipVisibilityPillUiFromSettings();
+        // Floating pill windows are created after MainWindow.Loaded so startup/autostart
+        // cannot create them under a temporary/default DPI context.
         UpdateBurstUiFromSettings();
         UpdateBurstMonitorVisibility();
         _filterKeysTimer.Tick += (_, _) =>
         {
             UpdateFilterKeysRuntime(applyWhenNeeded: true);
             TickFilterKeysPillRuntime();
+            TickPipVisibilityPillRuntime();
         };
         _filterKeysTimer.Start();
         _thumbnailTimer.Tick += (_, _) => UpdateCropThumbnails();
@@ -171,6 +173,7 @@ public partial class MainWindow : Window
         {
             SettingsService.Log("main_loaded | v0.9.2_preset_transaction");
             UpdateFilterKeysPillVisibility();
+            UpdatePipVisibilityPillVisibility();
             UpdateResolutionMatchUi();
             UpdateCropThumbnails(force: true);
         };
@@ -183,6 +186,7 @@ public partial class MainWindow : Window
             _burstInputTimer.Stop();
             CloseBurstMonitorWindow();
             CloseFilterKeysPillWindow();
+            ClosePipVisibilityPillWindow();
             if (_settings.FilterKeysTurnOffOnExit)
             {
                 TryTurnOffFilterKeys("종료 시 필터키 끄기");
@@ -693,6 +697,10 @@ public partial class MainWindow : Window
         preset.FilterKeysPillTargetOffsetY = _settings.FilterKeysPillTargetOffsetY;
         preset.FilterKeysPillTargetBaselineWidth = _settings.FilterKeysPillTargetBaselineWidth;
         preset.FilterKeysPillTargetBaselineHeight = _settings.FilterKeysPillTargetBaselineHeight;
+        preset.PipVisibilityPillVisible = _settings.PipVisibilityPillVisible;
+        preset.PipVisibilityPillLeft = _settings.PipVisibilityPillLeft;
+        preset.PipVisibilityPillTop = _settings.PipVisibilityPillTop;
+        preset.PipHideTurnsOffFilterKeys = _settings.PipHideTurnsOffFilterKeys;
         preset.BurstMonitorVisible = _settings.BurstMonitorVisible;
         preset.BurstCooldownReductionSeconds = ClampBurstSeconds(_settings.BurstCooldownReductionSeconds);
         preset.BurstCooldownReductionPercent = ClampBurstPercent(_settings.BurstCooldownReductionPercent);
@@ -763,6 +771,10 @@ public partial class MainWindow : Window
         _settings.FilterKeysPillTargetOffsetY = preset.FilterKeysPillTargetOffsetY;
         _settings.FilterKeysPillTargetBaselineWidth = preset.FilterKeysPillTargetBaselineWidth;
         _settings.FilterKeysPillTargetBaselineHeight = preset.FilterKeysPillTargetBaselineHeight;
+        _settings.PipVisibilityPillVisible = preset.PipVisibilityPillVisible;
+        _settings.PipVisibilityPillLeft = preset.PipVisibilityPillLeft;
+        _settings.PipVisibilityPillTop = preset.PipVisibilityPillTop;
+        _settings.PipHideTurnsOffFilterKeys = preset.PipHideTurnsOffFilterKeys;
         _settings.BurstMonitorVisible = preset.BurstMonitorVisible;
         _settings.BurstCooldownReductionSeconds = ClampBurstSeconds(preset.BurstCooldownReductionSeconds);
         _settings.BurstCooldownReductionPercent = ClampBurstPercent(preset.BurstCooldownReductionPercent);
@@ -1028,6 +1040,9 @@ public partial class MainWindow : Window
             UpdateCaptureSpeedUi();
             UpdateFilterKeysUiFromSettings();
             UpdateFilterKeysPillVisibility();
+            UpdatePipVisibilityPillUiFromSettings();
+            UpdatePipVisibilityPillVisibility();
+            RefreshFilterKeysPipHideSuppressionForCurrentPreset();
             UpdateBurstUiFromSettings();
             UpdateBurstMonitorVisibility();
         }
@@ -1058,6 +1073,7 @@ public partial class MainWindow : Window
         RefreshAllOverlays();
         UpdatePipSelectorItems();
         UpdateFilterKeysRuntime(applyWhenNeeded: true);
+        UpdatePipVisibilityPillState();
     }
 
     private void ApplyCommonSettingsToOverlays()
@@ -1223,31 +1239,7 @@ public partial class MainWindow : Window
 
     private void ToggleOverlay_Click(object sender, RoutedEventArgs e)
     {
-        EnsureOverlay();
-        var overlays = GetAllOverlays().ToList();
-        var anyVisible = overlays.Any(o => o.IsVisible) || (_burstMonitorWindow?.IsVisible == true);
-        if (anyVisible)
-        {
-            _allPipsTemporarilyHidden = true;
-            foreach (var overlay in overlays) overlay.Hide();
-            _burstMonitorWindow?.Hide();
-            StatusText.Text = "모든 PiP 숨김";
-        }
-        else
-        {
-            _allPipsTemporarilyHidden = false;
-            foreach (var overlay in overlays)
-            {
-                overlay.Show();
-                if (_target != null && _capture != null) overlay.SetCapture(_capture, _target.Hwnd);
-            }
-            if (_settings.BurstMonitorVisible)
-            {
-                EnsureBurstMonitorWindow();
-                UpdateBurstMonitorPipRows();
-            }
-            StatusText.Text = "모든 PiP 표시";
-        }
+        SetAllPipsTemporarilyHidden(!_allPipsTemporarilyHidden, "메인 PIP 토글 버튼");
     }
 
     private void ShowFilterKeysPillOnly_Click(object sender, RoutedEventArgs e)
@@ -1258,6 +1250,8 @@ public partial class MainWindow : Window
             overlay.Hide();
         }
         _burstMonitorWindow?.Hide();
+        ReleaseFilterKeysPipHideSuppression("필터키 PIP 버튼만 표시");
+        UpdatePipVisibilityPillState();
 
         _settings.FilterKeysPillVisible = true;
         _isUpdatingFilterKeysUi = true;
@@ -3202,6 +3196,10 @@ public partial class MainWindow : Window
     private void FilterKeysOptionChanged(object sender, RoutedEventArgs e)
     {
         if (_isInitializing || _isApplyingHistory || _isUpdatingFilterKeysUi) return;
+        if (ReferenceEquals(sender, FilterKeysEnabledCheck))
+        {
+            _filterKeysSuppressedByPipHide = false;
+        }
         SaveFilterKeysUiToSettings();
         UpdateFilterKeysPillVisibility();
         if (_filterKeysPillWindow != null) _filterKeysPillWindow.DragLocked = _settings.FilterKeysPillDragLocked;
@@ -3230,6 +3228,7 @@ public partial class MainWindow : Window
 
     private void ApplyFilterKeysNow_Click(object sender, RoutedEventArgs e)
     {
+        _filterKeysSuppressedByPipHide = false;
         SaveFilterKeysUiToSettings();
         _settings.FilterKeysEnabled = true;
         _isUpdatingFilterKeysUi = true;
@@ -3247,6 +3246,7 @@ public partial class MainWindow : Window
 
     private void TurnOffFilterKeys_Click(object sender, RoutedEventArgs e)
     {
+        _filterKeysSuppressedByPipHide = false;
         SaveFilterKeysUiToSettings();
         _settings.FilterKeysEnabled = false;
         _isUpdatingFilterKeysUi = true;
@@ -3270,6 +3270,13 @@ public partial class MainWindow : Window
     private void UpdateFilterKeysRuntime(bool applyWhenNeeded)
     {
         if (FilterKeysStatusText == null) return;
+
+        if (_filterKeysSuppressedByPipHide)
+        {
+            if (_filterKeysAppliedByThisApp) TryTurnOffFilterKeys("PIP 숨김 연동");
+            else SetFilterKeysVisualState("OFF", "필터키 OFF · PIP 숨김 연동", FilterKeysVisualKind.Off);
+            return;
+        }
 
         if (!_settings.FilterKeysEnabled)
         {
@@ -3570,6 +3577,17 @@ public partial class MainWindow : Window
     private void FilterKeysPill_ToggleRequested()
     {
         SaveFilterKeysUiToSettings();
+
+        if (_filterKeysSuppressedByPipHide)
+        {
+            _filterKeysSuppressedByPipHide = false;
+            UpdateFilterKeysRuntime(applyWhenNeeded: true);
+            StatusText.Text = "필터키 PIP 버튼: 사용 ON · PIP 숨김 연동 수동 해제";
+            ReapplyFilterKeysPillTopMost(force: true);
+            SaveSettings();
+            return;
+        }
+
         _settings.FilterKeysEnabled = !_settings.FilterKeysEnabled;
         _isUpdatingFilterKeysUi = true;
         try
