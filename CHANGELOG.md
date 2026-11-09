@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.9.11-beta
+
+### 수정
+- 프리셋 전환 후 일부 크롭이 비어 보이거나 엉뚱한 프레임처럼 남을 수 있는 레이스 수정
+  - 프리셋의 Crop ObservableCollection을 교체하는 동안 기존 메인 Overlay의 자동 RefreshItems를 bulk reload로 잠금
+  - 전환 전에 예약된 stale Dispatcher RefreshItems 콜백을 generation으로 무효화
+  - 새 프리셋 크롭 구성 완료 후 Overlay별 UI를 한 번만 재구성
+  - 일반 갱신 주기 제한을 우회해 최신 WGC 프레임을 즉시 강제 바인딩
+  - 전환 후 40ms / 120ms / 300ms 시점에 Source가 비어 있는 크롭만 자체 점검하고 재바인딩
+  - SetCapture 직후에도 강제 WGC 갱신
+- PIP 표시/숨김 상태를 프로그램과 PIP 알약 사이에서 완전 동기화
+  - 메인 상단 버튼과 알약 좌클릭 모두 동일한 SetAllPipsTemporarilyHidden 경로 사용
+  - 메인 버튼 문구를 현재 상태에 따라 `PiP 숨김` / `PiP 표시`로 즉시 변경
+  - `필터키만 표시`도 동일한 PIP visibility 상태 경로 사용
+  - 알약 우클릭 프리셋 전환 후에도 현재 PIP ON/OFF 상태를 그대로 적용
+  - 프리셋 콤보박스 전환과 알약 우클릭 전환 모두 동일한 SwitchPreset 복원 경로 사용
+- 새 프리셋 생성 시 PIP 알약 설정과 READY 사운드 설정이 빠질 수 있던 필드 누락 보완
+
+
 ## v0.9.10-beta
 
 ### 추가
