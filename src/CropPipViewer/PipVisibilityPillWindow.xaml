@@ -15,7 +15,8 @@
             Cursor="SizeAll"
             MouseLeftButtonDown="Pill_MouseLeftButtonDown"
             MouseMove="Pill_MouseMove"
-            MouseLeftButtonUp="Pill_MouseLeftButtonUp">
+            MouseLeftButtonUp="Pill_MouseLeftButtonUp"
+            MouseRightButtonUp="Pill_MouseRightButtonUp">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
