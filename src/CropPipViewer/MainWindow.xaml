@@ -242,6 +242,25 @@
                                 <CheckBox x:Name="ClickThroughCheck" Content="PIP 클릭 무시" Style="{StaticResource OptionCheck}" ToolTip="보스전처럼 PIP를 실수로 선택하거나 움직이면 안 되는 상황에서 사용합니다." Checked="OptionChanged" Unchecked="OptionChanged"/>
                                 <CheckBox x:Name="PipPositionLockCheck" Content="PIP 위치 고정" Style="{StaticResource OptionCheck}" ToolTip="현재 PIP 위치를 메이플스토리 클라이언트 좌상단 기준 상대 좌표로 저장하고, 메이플 창 이동 시 함께 따라가게 합니다." Checked="OptionChanged" Unchecked="OptionChanged"/>
                             </UniformGrid>
+                            <Border Background="#f5fbff" BorderBrush="#c7dbe8" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,10,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="PIP 표시/숨김 알약" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                                    <CheckBox x:Name="PipVisibilityPillVisibleCheck"
+                                              Content="PIP 표시/숨김 알약 표시"
+                                              Style="{StaticResource OptionCheck}"
+                                              ToolTip="화면 위에 PIP 전체 표시/숨김을 클릭으로 전환하는 작은 알약 버튼을 표시합니다. 알약을 드래그하면 위치를 옮길 수 있고 현재 프리셋에 저장됩니다."
+                                              Checked="PipVisibilityPillOptionChanged"
+                                              Unchecked="PipVisibilityPillOptionChanged"/>
+                                    <CheckBox x:Name="PipHideTurnsOffFilterKeysCheck"
+                                              Content="PIP 숨김 시 필터키도 함께 OFF"
+                                              Style="{StaticResource OptionCheck}"
+                                              ToolTip="PIP를 숨길 때 필터키가 ON이었다면 실행 중에만 잠시 OFF하고, PIP를 다시 표시할 때 ON으로 복원합니다. 원래 필터키가 OFF였다면 계속 OFF 상태를 유지합니다."
+                                              Checked="PipVisibilityPillOptionChanged"
+                                              Unchecked="PipVisibilityPillOptionChanged"/>
+                                    <TextBlock Text="필터키 연동은 원래 설정을 덮어쓰지 않습니다. PIP 숨김 전에 필터키가 OFF였다면 다시 표시해도 OFF로 유지됩니다."
+                                               Foreground="#667" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

@@ -21,6 +21,7 @@ public partial class MainWindow
     private bool _pipFocusCurrentlyAutoHidden;
     private bool _pipFocusAutoHidBurstMonitor;
     private bool _pipFocusAutoHidFilterKeysPill;
+    private bool _pipFocusAutoHidPipVisibilityPill;
 
     private static string PipFocusVisibilityPreferencePath =>
         Path.Combine(SettingsService.AppDir, "pip-focus-visibility.txt");
@@ -149,6 +150,12 @@ public partial class MainWindow
             _filterKeysPillWindow!.Hide();
         }
 
+        _pipFocusAutoHidPipVisibilityPill = _pipVisibilityPillWindow?.IsVisible == true;
+        if (_pipFocusAutoHidPipVisibilityPill)
+        {
+            _pipVisibilityPillWindow!.Hide();
+        }
+
         _pipFocusCurrentlyAutoHidden = true;
     }
 
@@ -157,7 +164,8 @@ public partial class MainWindow
         if (!_pipFocusCurrentlyAutoHidden &&
             _pipFocusAutoHiddenPipKeys.Count == 0 &&
             !_pipFocusAutoHidBurstMonitor &&
-            !_pipFocusAutoHidFilterKeysPill)
+            !_pipFocusAutoHidFilterKeysPill &&
+            !_pipFocusAutoHidPipVisibilityPill)
         {
             return;
         }
@@ -225,6 +233,30 @@ public partial class MainWindow
             }
         }
         _pipFocusAutoHidFilterKeysPill = false;
+
+        if (_pipFocusAutoHidPipVisibilityPill)
+        {
+            if (_pipVisibilityPillWindow == null && _settings.PipVisibilityPillVisible)
+            {
+                UpdatePipVisibilityPillVisibility();
+            }
+
+            if (_pipVisibilityPillWindow != null &&
+                _settings.PipVisibilityPillVisible &&
+                !_pipVisibilityPillWindow.IsVisible)
+            {
+                try
+                {
+                    _pipVisibilityPillWindow.Show();
+                    _pipVisibilityPillWindow.SetPipsHidden(_allPipsTemporarilyHidden);
+                    _pipVisibilityPillWindow.ForceTopMost();
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+        }
+        _pipFocusAutoHidPipVisibilityPill = false;
         _pipFocusCurrentlyAutoHidden = false;
     }
 
