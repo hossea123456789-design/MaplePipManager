@@ -134,7 +134,10 @@ public partial class MainWindow
         if (_pipVisibilityPillWindow == null || !_pipVisibilityPillWindow.IsVisible) return;
 
         var now = DateTime.UtcNow;
-        if (!force && (now - _lastPipVisibilityPillTopmostUtc).TotalMilliseconds < 1200) return;
+        // Keep the same TopMost re-assert cadence as the FilterKeys pill.
+        // Both are called from the same 350 ms runtime timer, so using the same
+        // 120 ms throttle makes their focus-transition response effectively identical.
+        if (!force && (now - _lastPipVisibilityPillTopmostUtc).TotalMilliseconds < 120) return;
 
         _lastPipVisibilityPillTopmostUtc = now;
         _pipVisibilityPillWindow.ForceTopMost();
