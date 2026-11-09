@@ -576,6 +576,10 @@ public partial class MainWindow : Window
             FilterKeysPillTargetOffsetY = _settings.FilterKeysPillTargetOffsetY,
             FilterKeysPillTargetBaselineWidth = _settings.FilterKeysPillTargetBaselineWidth,
             FilterKeysPillTargetBaselineHeight = _settings.FilterKeysPillTargetBaselineHeight,
+            PipVisibilityPillVisible = _settings.PipVisibilityPillVisible,
+            PipVisibilityPillLeft = _settings.PipVisibilityPillLeft,
+            PipVisibilityPillTop = _settings.PipVisibilityPillTop,
+            PipHideTurnsOffFilterKeys = _settings.PipHideTurnsOffFilterKeys,
             BurstMonitorVisible = _settings.BurstMonitorVisible,
             BurstCooldownReductionSeconds = ClampBurstSeconds(_settings.BurstCooldownReductionSeconds),
             BurstCooldownReductionPercent = ClampBurstPercent(_settings.BurstCooldownReductionPercent),
@@ -588,6 +592,9 @@ public partial class MainWindow : Window
             SemiBurstTriggerKeyName = _settings.SemiBurstTriggerKeyName ?? string.Empty,
             BurstTriggerKeyName = _settings.BurstTriggerKeyName ?? string.Empty,
             OriginBurstTriggerKeyName = _settings.OriginBurstTriggerKeyName ?? string.Empty,
+            SemiBurstReadySound = _settings.SemiBurstReadySound,
+            BurstReadySound = _settings.BurstReadySound,
+            OriginBurstReadySound = _settings.OriginBurstReadySound,
             BurstWarningThresholdSeconds = ClampBurstWarningSeconds(_settings.BurstWarningThresholdSeconds),
             BurstMonitorOpacity = ClampBurstMonitorOpacity(_settings.BurstMonitorOpacity),
             BurstMonitorBackgroundOpacity = ClampBurstMonitorBackgroundOpacity(_settings.BurstMonitorBackgroundOpacity),
@@ -1000,6 +1007,12 @@ public partial class MainWindow : Window
 
     private void LoadCurrentSettingsIntoUiAndOverlays()
     {
+        // The main overlay survives preset switches. Suspend its ObservableCollection-driven
+        // refresh callbacks while replacing the crop set so stale Dispatcher callbacks cannot
+        // rebuild Image controls after the new preset has already been rendered.
+        var survivingMainOverlay = _overlay;
+        survivingMainOverlay?.BeginBulkCropReload();
+
         _isApplyingHistory = true;
         try
         {
@@ -1013,6 +1026,7 @@ public partial class MainWindow : Window
         finally
         {
             _isApplyingHistory = false;
+            survivingMainOverlay?.EndBulkCropReload(refreshNow: false);
         }
 
         _undoHistory.Clear();
@@ -1070,7 +1084,12 @@ public partial class MainWindow : Window
         if (_target != null && _capture != null) _overlay?.SetCapture(_capture, _target.Hwnd);
         SyncDetachedOverlaysWithCurrentCropGroups();
         ApplyCommonSettingsToOverlays();
-        RefreshAllOverlays();
+        RefreshAllOverlays(forceCapture: true);
+
+        // Session visibility is global and must remain identical whether the preset was
+        // switched from the main ComboBox or from the PIP pill context menu.
+        SetAllPipsTemporarilyHidden(_allPipsTemporarilyHidden, "프리셋 전환 상태 동기화");
+
         UpdatePipSelectorItems();
         UpdateFilterKeysRuntime(applyWhenNeeded: true);
         UpdatePipVisibilityPillState();
@@ -1244,14 +1263,9 @@ public partial class MainWindow : Window
 
     private void ShowFilterKeysPillOnly_Click(object sender, RoutedEventArgs e)
     {
-        _allPipsTemporarilyHidden = true;
-        foreach (var overlay in GetAllOverlays().ToList())
-        {
-            overlay.Hide();
-        }
-        _burstMonitorWindow?.Hide();
+        // Route through the same global PIP visibility state used by the main toggle and pill.
+        SetAllPipsTemporarilyHidden(true, "필터키 PIP 버튼만 표시");
         ReleaseFilterKeysPipHideSuppression("필터키 PIP 버튼만 표시");
-        UpdatePipVisibilityPillState();
 
         _settings.FilterKeysPillVisible = true;
         _isUpdatingFilterKeysUi = true;
@@ -1557,11 +1571,21 @@ public partial class MainWindow : Window
         }));
     }
 
-    private void RefreshAllOverlays()
+    private void RefreshAllOverlays(bool forceCapture = false)
     {
         EnsureDetachedOverlaysForExistingGroups();
-        _overlay?.RefreshItems();
-        foreach (var detached in _detachedOverlays.Values.ToList()) detached.RefreshItems();
+
+        if (forceCapture)
+        {
+            _overlay?.RefreshItemsAndCaptureNow();
+            foreach (var detached in _detachedOverlays.Values.ToList()) detached.RefreshItemsAndCaptureNow();
+        }
+        else
+        {
+            _overlay?.RefreshItems();
+            foreach (var detached in _detachedOverlays.Values.ToList()) detached.RefreshItems();
+        }
+
         ApplyDetachedPipSelectionVisuals();
         if (IsActive) UpdateGridCropLocationHighlights();
     }
