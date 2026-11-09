@@ -2,7 +2,7 @@
 
 MapleStory 창의 원하는 영역을 잘라 별도의 PiP(Always-on-top overlay)로 배치하는 Windows용 도구입니다.
 
-> 공개 베타: **v0.9.7-beta**  
+> 공개 베타: **v0.9.8-beta**  
 > 내부 개발 기준: **v33c 기반 + 공개 피드백 반영**
 
 ![UI overview](docs/images/ui-overview.png)
@@ -109,3 +109,7 @@ dotnet build .\src\CropPipViewer\CropPipViewer.csproj -c Release
 ## 소스 이용 조건
 
 현재 이 저장소에는 별도의 오픈소스 라이선스를 부여하지 않습니다. 공개된 소스는 검토 목적으로 열람할 수 있지만, 복제·수정·재배포·상업적 이용 권한이 자동으로 부여되는 것은 아닙니다.
+
+
+### PIP 표시/숨김 알약
+PIP 탭에서 `PIP 표시/숨김 알약 표시`를 켜면 화면 위의 작은 알약으로 모든 PIP를 빠르게 숨기거나 다시 표시할 수 있습니다. 위치와 노출 여부는 프리셋별로 저장됩니다. `PIP 숨김 시 필터키도 함께 OFF`를 켜면 숨길 당시 필터키가 ON인 경우에만 임시 OFF했다가 PIP 표시 시 복원하며, 원래 OFF였던 필터키는 계속 OFF로 유지됩니다.
