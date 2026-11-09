@@ -163,6 +163,14 @@ public partial class MainWindow
     private void UpdatePipVisibilityPillState()
     {
         _pipVisibilityPillWindow?.SetPipsHidden(_allPipsTemporarilyHidden);
+
+        if (ToggleOverlayButton != null)
+        {
+            ToggleOverlayButton.Content = _allPipsTemporarilyHidden ? "PiP 표시" : "PiP 숨김";
+            ToggleOverlayButton.ToolTip = _allPipsTemporarilyHidden
+                ? "현재 PIP가 숨겨져 있습니다. 클릭하면 PIP 알약과 동일하게 전체 PIP를 표시합니다."
+                : "현재 PIP가 표시 중입니다. 클릭하면 PIP 알약과 동일하게 전체 PIP를 숨깁니다.";
+        }
     }
 
     private void TickPipVisibilityPillRuntime()
