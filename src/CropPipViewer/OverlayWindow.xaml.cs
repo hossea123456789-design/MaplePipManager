@@ -355,6 +355,36 @@ public partial class OverlayWindow : Window
         ForceCaptureRefresh();
     }
 
+    public async void VerifyCropBindingsAfterPresetSwitch()
+    {
+        try
+        {
+            // The latest WGC frame can arrive a little after the preset UI transaction.
+            // Retry only when an enabled crop still has no Image Source, so normal rendering
+            // does not pay any additional refresh cost.
+            foreach (var delayMs in new[] { 40, 120, 300 })
+            {
+                await Task.Delay(delayMs);
+                if (_allowClose || _bulkCropReloadDepth > 0) return;
+
+                var missing = GetVisibleCrops()
+                    .Where(crop => crop.Enabled)
+                    .Where(crop => !_images.TryGetValue(crop.Id, out var image) || image.Source == null)
+                    .Select(crop => crop.Id)
+                    .ToList();
+
+                if (missing.Count == 0) return;
+
+                SettingsService.Log($"preset_crop_binding_retry | group={_detachedGroupId ?? "main"} | missing={string.Join(",", missing)} | delay_ms={delayMs}");
+                ForceCaptureRefresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            SettingsService.Log($"preset_crop_binding_retry_exception | group={_detachedGroupId ?? "main"} | {ex}");
+        }
+    }
+
     public void ForceCaptureRefresh()
     {
         if (_bulkCropReloadDepth > 0)
