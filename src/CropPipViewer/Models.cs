@@ -88,6 +88,13 @@ public sealed class AppSettings
     public int FilterKeysPillTargetBaselineWidth { get; set; }
     public int FilterKeysPillTargetBaselineHeight { get; set; }
 
+    // Floating pill that toggles all combat PiPs visible/hidden. Saved per preset.
+    public bool PipVisibilityPillVisible { get; set; } = false;
+    public double PipVisibilityPillLeft { get; set; } = 1060;
+    public double PipVisibilityPillTop { get; set; } = 160;
+    // When true, hiding PiPs temporarily suppresses FilterKeys only if FilterKeys was configured ON.
+    public bool PipHideTurnsOffFilterKeys { get; set; } = false;
+
     // Burst cooldown monitor. Saved per preset. v30 detection uses per-skill learned READY / post-use states; no OCR or global brightness threshold.
     public bool BurstMonitorVisible { get; set; } = false;
     public double BurstCooldownReductionSeconds { get; set; } = 0;
@@ -174,6 +181,11 @@ public sealed class PipPreset
     public double? FilterKeysPillTargetOffsetY { get; set; }
     public int FilterKeysPillTargetBaselineWidth { get; set; }
     public int FilterKeysPillTargetBaselineHeight { get; set; }
+
+    public bool PipVisibilityPillVisible { get; set; } = false;
+    public double PipVisibilityPillLeft { get; set; } = 1060;
+    public double PipVisibilityPillTop { get; set; } = 160;
+    public bool PipHideTurnsOffFilterKeys { get; set; } = false;
 
     public bool BurstMonitorVisible { get; set; } = false;
     public double BurstCooldownReductionSeconds { get; set; } = 0;
