@@ -80,6 +80,8 @@ public partial class MainWindow
             };
             _pipVisibilityPillWindow.ToggleRequested += PipVisibilityPill_ToggleRequested;
             _pipVisibilityPillWindow.PillMoved += PipVisibilityPill_Moved;
+            _pipVisibilityPillWindow.PresetMenuRequested += PipVisibilityPill_PresetMenuRequested;
+            _pipVisibilityPillWindow.PresetRequested += PipVisibilityPill_PresetRequested;
         }
         else
         {
@@ -101,6 +103,8 @@ public partial class MainWindow
         if (_pipVisibilityPillWindow == null) return;
         _pipVisibilityPillWindow.ToggleRequested -= PipVisibilityPill_ToggleRequested;
         _pipVisibilityPillWindow.PillMoved -= PipVisibilityPill_Moved;
+        _pipVisibilityPillWindow.PresetMenuRequested -= PipVisibilityPill_PresetMenuRequested;
+        _pipVisibilityPillWindow.PresetRequested -= PipVisibilityPill_PresetRequested;
         _pipVisibilityPillWindow.ForceClose();
         _pipVisibilityPillWindow = null;
     }
@@ -108,6 +112,44 @@ public partial class MainWindow
     private void PipVisibilityPill_ToggleRequested()
     {
         SetAllPipsTemporarilyHidden(!_allPipsTemporarilyHidden, "PIP 표시/숨김 알약");
+    }
+
+    private void PipVisibilityPill_PresetMenuRequested(PipVisibilityPillWindow pill)
+    {
+        var activeIndex = Math.Clamp(_settings.ActivePresetIndex, 0, PresetSlotCount - 1);
+        var items = _settings.Presets
+            .Select((preset, index) =>
+            {
+                var name = string.IsNullOrWhiteSpace(preset.Name) ? $"프리셋 {index + 1}" : preset.Name.Trim();
+                return (Index: index, Label: $"P{index + 1} · {name}", IsCurrent: index == activeIndex);
+            })
+            .Take(PresetSlotCount)
+            .ToList();
+
+        pill.ShowPresetMenu(items);
+        ReapplyPipVisibilityPillTopMost(force: true);
+    }
+
+    private void PipVisibilityPill_PresetRequested(int presetIndex)
+    {
+        presetIndex = Math.Clamp(presetIndex, 0, PresetSlotCount - 1);
+        if (presetIndex == _settings.ActivePresetIndex)
+        {
+            StatusText.Text = $"현재 프리셋: P{presetIndex + 1} · {_settings.Presets[presetIndex].Name}";
+            ReapplyPipVisibilityPillTopMost(force: true);
+            return;
+        }
+
+        SettingsService.Log($"pip_visibility_pill_preset_request | from={_settings.ActivePresetIndex + 1} | to={presetIndex + 1}");
+        SwitchPreset(presetIndex);
+
+        // SwitchPreset may close this pill if the destination preset has the pill disabled.
+        // If it remains enabled, refresh its visual/topmost state after the switch.
+        if (_pipVisibilityPillWindow != null)
+        {
+            _pipVisibilityPillWindow.SetPipsHidden(_allPipsTemporarilyHidden);
+            ReapplyPipVisibilityPillTopMost(force: true);
+        }
     }
 
     private void PipVisibilityPill_Moved(PipVisibilityPillWindow pill)

@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -18,6 +20,8 @@ public partial class PipVisibilityPillWindow : Window
 
     public event Action? ToggleRequested;
     public event Action<PipVisibilityPillWindow>? PillMoved;
+    public event Action<PipVisibilityPillWindow>? PresetMenuRequested;
+    public event Action<int>? PresetRequested;
 
     public PipVisibilityPillWindow()
     {
@@ -84,7 +88,47 @@ public partial class PipVisibilityPillWindow : Window
 
     private void UpdateTooltip()
     {
-        ToolTip = "클릭: PIP 전체 표시/숨김\n드래그: 알약 위치 이동";
+        ToolTip = "좌클릭: PIP 전체 표시/숨김\n우클릭: 프리셋 전환\n드래그: 알약 위치 이동";
+    }
+
+    public void ShowPresetMenu(IReadOnlyList<(int Index, string Label, bool IsCurrent)> presets)
+    {
+        var menu = new ContextMenu
+        {
+            Placement = PlacementMode.MousePoint,
+            StaysOpen = false
+        };
+
+        foreach (var preset in presets.OrderBy(p => p.Index))
+        {
+            var item = new MenuItem
+            {
+                Header = preset.Label,
+                IsCheckable = true,
+                IsChecked = preset.IsCurrent,
+                StaysOpenOnClick = false,
+                Tag = preset.Index
+            };
+            item.Click += (_, _) =>
+            {
+                if (item.Tag is int index)
+                {
+                    PresetRequested?.Invoke(index);
+                }
+            };
+            menu.Items.Add(item);
+        }
+
+        if (menu.Items.Count == 0)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = "사용 가능한 프리셋 없음",
+                IsEnabled = false
+            });
+        }
+
+        menu.IsOpen = true;
     }
 
     protected override void OnClosed(EventArgs e)
@@ -136,6 +180,12 @@ public partial class PipVisibilityPillWindow : Window
             ToggleRequested?.Invoke();
         }
 
+        e.Handled = true;
+    }
+
+    private void Pill_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        PresetMenuRequested?.Invoke(this);
         e.Handled = true;
     }
 }
