@@ -1085,6 +1085,11 @@ public partial class MainWindow : Window
         SyncDetachedOverlaysWithCurrentCropGroups();
         ApplyCommonSettingsToOverlays();
         RefreshAllOverlays(forceCapture: true);
+        _overlay?.VerifyCropBindingsAfterPresetSwitch();
+        foreach (var detached in _detachedOverlays.Values.ToList())
+        {
+            detached.VerifyCropBindingsAfterPresetSwitch();
+        }
 
         // Session visibility is global and must remain identical whether the preset was
         // switched from the main ComboBox or from the PIP pill context menu.
