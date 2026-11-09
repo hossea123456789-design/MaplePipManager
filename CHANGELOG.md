@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.9.9-beta
+
+### 수정
+- PIP 표시/숨김 알약의 TopMost 재적용 속도를 FilterKeys 알약과 동일하게 동기화
+  - 기존 1200ms 제한 → 120ms 제한
+  - 두 알약 모두 동일한 350ms 런타임 틱에서 TopMost 재확인
+- 자동 시작 시 PIP 표시/숨김 알약 크기 확대 방어 로직 점검
+  - MainWindow Loaded 이후 생성
+  - 생성 직후 고정 크기 적용
+  - SourceInitialized에서 재고정
+  - Loaded에서 재고정
+  - Min/Max/Width/Height 모두 고정
+  - 기존 FilterKeys 알약과 동일한 방어 구조 유지
+
+
 ## v0.9.8-beta
 
 ### 추가
