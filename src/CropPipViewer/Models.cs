@@ -92,6 +92,11 @@ public sealed class AppSettings
     public bool PipVisibilityPillVisible { get; set; } = false;
     public double PipVisibilityPillLeft { get; set; } = 1060;
     public double PipVisibilityPillTop { get; set; } = 160;
+    // When PIP position lock is enabled, this control pill follows the selected MapleStory client too.
+    public double? PipVisibilityPillTargetOffsetX { get; set; }
+    public double? PipVisibilityPillTargetOffsetY { get; set; }
+    public int PipVisibilityPillTargetBaselineWidth { get; set; }
+    public int PipVisibilityPillTargetBaselineHeight { get; set; }
     // When true, hiding PiPs temporarily suppresses FilterKeys only if FilterKeys was configured ON.
     public bool PipHideTurnsOffFilterKeys { get; set; } = false;
 
@@ -185,6 +190,10 @@ public sealed class PipPreset
     public bool PipVisibilityPillVisible { get; set; } = false;
     public double PipVisibilityPillLeft { get; set; } = 1060;
     public double PipVisibilityPillTop { get; set; } = 160;
+    public double? PipVisibilityPillTargetOffsetX { get; set; }
+    public double? PipVisibilityPillTargetOffsetY { get; set; }
+    public int PipVisibilityPillTargetBaselineWidth { get; set; }
+    public int PipVisibilityPillTargetBaselineHeight { get; set; }
     public bool PipHideTurnsOffFilterKeys { get; set; } = false;
 
     public bool BurstMonitorVisible { get; set; } = false;

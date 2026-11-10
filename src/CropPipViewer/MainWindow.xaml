@@ -240,7 +240,7 @@
                                 <CheckBox x:Name="ResizeItemsWithWindowCheck" Content="창 크기 연동" Style="{StaticResource OptionCheck}" ToolTip="PIP 창 크기 조정 시 내부 크롭 표시도 함께 조정합니다." Checked="OptionChanged" Unchecked="OptionChanged"/>
                                 <CheckBox x:Name="TopMostCheck" Content="항상 위" Style="{StaticResource OptionCheck}" IsChecked="True" Checked="OptionChanged" Unchecked="OptionChanged"/>
                                 <CheckBox x:Name="ClickThroughCheck" Content="PIP 클릭 무시" Style="{StaticResource OptionCheck}" ToolTip="보스전처럼 PIP를 실수로 선택하거나 움직이면 안 되는 상황에서 사용합니다." Checked="OptionChanged" Unchecked="OptionChanged"/>
-                                <CheckBox x:Name="PipPositionLockCheck" Content="PIP 위치 고정" Style="{StaticResource OptionCheck}" ToolTip="현재 PIP 위치를 메이플스토리 클라이언트 좌상단 기준 상대 좌표로 저장하고, 메이플 창 이동 시 함께 따라가게 합니다." Checked="OptionChanged" Unchecked="OptionChanged"/>
+                                <CheckBox x:Name="PipPositionLockCheck" Content="PIP 위치 고정" Style="{StaticResource OptionCheck}" ToolTip="현재 PIP와 FilterKeys/PIP 제어 알약, 극딜 감지 PIP의 위치를 메이플스토리 클라이언트 기준 상대 좌표로 저장하고, 메이플 창 이동 시 함께 따라가게 합니다." Checked="OptionChanged" Unchecked="OptionChanged"/>
                             </UniformGrid>
                             <Border Background="#f5fbff" BorderBrush="#c7dbe8" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,10,0,0">
                                 <StackPanel>

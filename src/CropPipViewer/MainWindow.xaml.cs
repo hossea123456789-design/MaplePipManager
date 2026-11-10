@@ -579,6 +579,10 @@ public partial class MainWindow : Window
             PipVisibilityPillVisible = _settings.PipVisibilityPillVisible,
             PipVisibilityPillLeft = _settings.PipVisibilityPillLeft,
             PipVisibilityPillTop = _settings.PipVisibilityPillTop,
+            PipVisibilityPillTargetOffsetX = _settings.PipVisibilityPillTargetOffsetX,
+            PipVisibilityPillTargetOffsetY = _settings.PipVisibilityPillTargetOffsetY,
+            PipVisibilityPillTargetBaselineWidth = _settings.PipVisibilityPillTargetBaselineWidth,
+            PipVisibilityPillTargetBaselineHeight = _settings.PipVisibilityPillTargetBaselineHeight,
             PipHideTurnsOffFilterKeys = _settings.PipHideTurnsOffFilterKeys,
             BurstMonitorVisible = _settings.BurstMonitorVisible,
             BurstCooldownReductionSeconds = ClampBurstSeconds(_settings.BurstCooldownReductionSeconds),
@@ -707,6 +711,10 @@ public partial class MainWindow : Window
         preset.PipVisibilityPillVisible = _settings.PipVisibilityPillVisible;
         preset.PipVisibilityPillLeft = _settings.PipVisibilityPillLeft;
         preset.PipVisibilityPillTop = _settings.PipVisibilityPillTop;
+        preset.PipVisibilityPillTargetOffsetX = _settings.PipVisibilityPillTargetOffsetX;
+        preset.PipVisibilityPillTargetOffsetY = _settings.PipVisibilityPillTargetOffsetY;
+        preset.PipVisibilityPillTargetBaselineWidth = _settings.PipVisibilityPillTargetBaselineWidth;
+        preset.PipVisibilityPillTargetBaselineHeight = _settings.PipVisibilityPillTargetBaselineHeight;
         preset.PipHideTurnsOffFilterKeys = _settings.PipHideTurnsOffFilterKeys;
         preset.BurstMonitorVisible = _settings.BurstMonitorVisible;
         preset.BurstCooldownReductionSeconds = ClampBurstSeconds(_settings.BurstCooldownReductionSeconds);
@@ -781,6 +789,10 @@ public partial class MainWindow : Window
         _settings.PipVisibilityPillVisible = preset.PipVisibilityPillVisible;
         _settings.PipVisibilityPillLeft = preset.PipVisibilityPillLeft;
         _settings.PipVisibilityPillTop = preset.PipVisibilityPillTop;
+        _settings.PipVisibilityPillTargetOffsetX = preset.PipVisibilityPillTargetOffsetX;
+        _settings.PipVisibilityPillTargetOffsetY = preset.PipVisibilityPillTargetOffsetY;
+        _settings.PipVisibilityPillTargetBaselineWidth = preset.PipVisibilityPillTargetBaselineWidth;
+        _settings.PipVisibilityPillTargetBaselineHeight = preset.PipVisibilityPillTargetBaselineHeight;
         _settings.PipHideTurnsOffFilterKeys = preset.PipHideTurnsOffFilterKeys;
         _settings.BurstMonitorVisible = preset.BurstMonitorVisible;
         _settings.BurstCooldownReductionSeconds = ClampBurstSeconds(preset.BurstCooldownReductionSeconds);
@@ -1760,6 +1772,7 @@ public partial class MainWindow : Window
         if (pipLockChanged && _settings.PipPositionLockedToTarget)
         {
             CaptureFilterKeysPillRelativePosition(save: false);
+            CapturePipVisibilityPillRelativePosition(save: false);
             CaptureBurstMonitorRelativePosition(save: false);
         }
         SaveSettings();
@@ -4126,7 +4139,7 @@ public partial class MainWindow : Window
     {
         if (_settings.BurstMonitorVisible)
         {
-            if (_allPipsTemporarilyHidden)
+            if (_allPipsTemporarilyHidden || !IsPipFocusVisibilityDisplayAllowedNow())
             {
                 _burstMonitorWindow?.Hide();
                 return;
@@ -4142,6 +4155,12 @@ public partial class MainWindow : Window
 
     private void EnsureBurstMonitorWindow()
     {
+        if (!IsPipFocusVisibilityDisplayAllowedNow())
+        {
+            _burstMonitorWindow?.Hide();
+            return;
+        }
+
         var left = double.IsFinite(_settings.BurstMonitorLeft) ? _settings.BurstMonitorLeft : 980;
         var top = double.IsFinite(_settings.BurstMonitorTop) ? _settings.BurstMonitorTop : 220;
 
@@ -4392,7 +4411,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_allPipsTemporarilyHidden)
+        if (_allPipsTemporarilyHidden || !IsPipFocusVisibilityDisplayAllowedNow())
         {
             _burstMonitorWindow?.Hide();
             return;
