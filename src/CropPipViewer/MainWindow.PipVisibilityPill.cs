@@ -8,6 +8,8 @@ public partial class MainWindow
     private PipVisibilityPillWindow? _pipVisibilityPillWindow;
     private bool _isUpdatingPipVisibilityPillUi;
     private bool _filterKeysSuppressedByPipHide;
+    private int _pipVisibilityPillSessionBaselineWidth;
+    private int _pipVisibilityPillSessionBaselineHeight;
     private DateTime _lastPipVisibilityPillTopmostUtc = DateTime.MinValue;
 
     private void UpdatePipVisibilityPillUiFromSettings()
@@ -96,6 +98,18 @@ public partial class MainWindow
         _pipVisibilityPillWindow.Topmost = true;
         _pipVisibilityPillWindow.SetPipsHidden(_allPipsTemporarilyHidden);
         ReapplyPipVisibilityPillTopMost(force: true);
+
+        if (_settings.PipPositionLockedToTarget)
+        {
+            if (_settings.PipVisibilityPillTargetOffsetX is null || _settings.PipVisibilityPillTargetOffsetY is null)
+            {
+                CapturePipVisibilityPillRelativePosition(save: false);
+            }
+            else
+            {
+                ApplyPipVisibilityPillTargetLockedPosition();
+            }
+        }
     }
 
     private void ClosePipVisibilityPillWindow()
@@ -157,6 +171,10 @@ public partial class MainWindow
         if (_isInitializing || _isApplyingHistory) return;
         _settings.PipVisibilityPillLeft = Math.Round(pill.Left, 2);
         _settings.PipVisibilityPillTop = Math.Round(pill.Top, 2);
+        if (_settings.PipPositionLockedToTarget)
+        {
+            CapturePipVisibilityPillRelativePosition(save: false);
+        }
         SaveSettingsThrottled();
     }
 
@@ -176,7 +194,80 @@ public partial class MainWindow
     private void TickPipVisibilityPillRuntime()
     {
         if (_pipVisibilityPillWindow == null || !_pipVisibilityPillWindow.IsVisible) return;
+
+        if (_settings.PipPositionLockedToTarget)
+        {
+            ApplyPipVisibilityPillTargetLockedPosition();
+        }
+
         ReapplyPipVisibilityPillTopMost(force: false);
+    }
+
+    private void CapturePipVisibilityPillRelativePosition(bool save)
+    {
+        if (_pipVisibilityPillWindow == null) return;
+        if (!TryGetTargetClientRectForMain(out var rect)) return;
+
+        _pipVisibilityPillSessionBaselineWidth = rect.Width;
+        _pipVisibilityPillSessionBaselineHeight = rect.Height;
+        _settings.PipVisibilityPillTargetBaselineWidth = rect.Width;
+        _settings.PipVisibilityPillTargetBaselineHeight = rect.Height;
+        _settings.PipVisibilityPillTargetOffsetX = Math.Round(_pipVisibilityPillWindow.Left - rect.X, 2);
+        _settings.PipVisibilityPillTargetOffsetY = Math.Round(_pipVisibilityPillWindow.Top - rect.Y, 2);
+
+        if (save) SaveSettings();
+    }
+
+    private bool IsTargetRectUsableForPipVisibilityPillLock(RectI rect)
+    {
+        if (_pipVisibilityPillSessionBaselineWidth <= 0 || _pipVisibilityPillSessionBaselineHeight <= 0)
+        {
+            _pipVisibilityPillSessionBaselineWidth = rect.Width;
+            _pipVisibilityPillSessionBaselineHeight = rect.Height;
+        }
+
+        if (rect.Width > _pipVisibilityPillSessionBaselineWidth) _pipVisibilityPillSessionBaselineWidth = rect.Width;
+        if (rect.Height > _pipVisibilityPillSessionBaselineHeight) _pipVisibilityPillSessionBaselineHeight = rect.Height;
+        _settings.PipVisibilityPillTargetBaselineWidth = _pipVisibilityPillSessionBaselineWidth;
+        _settings.PipVisibilityPillTargetBaselineHeight = _pipVisibilityPillSessionBaselineHeight;
+        return rect.Width > 0 && rect.Height > 0;
+    }
+
+    private void ApplyPipVisibilityPillTargetLockedPosition()
+    {
+        if (!_settings.PipPositionLockedToTarget) return;
+        if (_pipVisibilityPillWindow == null || !_pipVisibilityPillWindow.IsVisible) return;
+
+        if (_settings.PipVisibilityPillTargetOffsetX is null || _settings.PipVisibilityPillTargetOffsetY is null)
+        {
+            CapturePipVisibilityPillRelativePosition(save: false);
+            return;
+        }
+
+        if (!TryGetTargetClientRectForMain(out var rect)) return;
+        if (!IsTargetRectUsableForPipVisibilityPillLock(rect)) return;
+
+        var pillWidth = Math.Max(1, _pipVisibilityPillWindow.ActualWidth > 1 ? _pipVisibilityPillWindow.ActualWidth : _pipVisibilityPillWindow.Width);
+        var pillHeight = Math.Max(1, _pipVisibilityPillWindow.ActualHeight > 1 ? _pipVisibilityPillWindow.ActualHeight : _pipVisibilityPillWindow.Height);
+        var desiredLeft = Math.Round(rect.X + _settings.PipVisibilityPillTargetOffsetX.Value, 2);
+        var desiredTop = Math.Round(rect.Y + _settings.PipVisibilityPillTargetOffsetY.Value, 2);
+
+        // Keep the control pill reachable even after MapleStory resolution/client-size changes.
+        desiredLeft = Math.Round(ClampToRange(desiredLeft, rect.X, rect.X + Math.Max(0, rect.Width - pillWidth)), 2);
+        desiredTop = Math.Round(ClampToRange(desiredTop, rect.Y, rect.Y + Math.Max(0, rect.Height - pillHeight)), 2);
+
+        if (Math.Abs(_pipVisibilityPillWindow.Left - desiredLeft) < 0.5 &&
+            Math.Abs(_pipVisibilityPillWindow.Top - desiredTop) < 0.5)
+        {
+            ReapplyPipVisibilityPillTopMost(force: false);
+            return;
+        }
+
+        _pipVisibilityPillWindow.Left = desiredLeft;
+        _pipVisibilityPillWindow.Top = desiredTop;
+        _settings.PipVisibilityPillLeft = desiredLeft;
+        _settings.PipVisibilityPillTop = desiredTop;
+        ReapplyPipVisibilityPillTopMost(force: true);
     }
 
     private void ReapplyPipVisibilityPillTopMost(bool force)
