@@ -125,6 +125,11 @@ public partial class MainWindow
         return foregroundPid == (uint)_target.ProcessId;
     }
 
+    private bool IsPipFocusVisibilityDisplayAllowedNow()
+    {
+        return !_pipFocusVisibilityEnabled || IsPipFocusVisibilityContextAllowed();
+    }
+
     private void HidePipsForFocusRule()
     {
         // Already hidden for this focus transition. Avoid repeated Hide() calls every 100 ms.
@@ -197,6 +202,7 @@ public partial class MainWindow
 
             if (_burstMonitorWindow != null &&
                 _settings.BurstMonitorVisible &&
+                !_allPipsTemporarilyHidden &&
                 !_burstMonitorWindow.IsVisible)
             {
                 try
@@ -249,6 +255,10 @@ public partial class MainWindow
                 {
                     _pipVisibilityPillWindow.Show();
                     _pipVisibilityPillWindow.SetPipsHidden(_allPipsTemporarilyHidden);
+                    if (_settings.PipPositionLockedToTarget)
+                    {
+                        ApplyPipVisibilityPillTargetLockedPosition();
+                    }
                     _pipVisibilityPillWindow.ForceTopMost();
                 }
                 catch (InvalidOperationException)
